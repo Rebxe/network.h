@@ -9,7 +9,6 @@
 namespace auto_dao
 {
 	int Batch_Size=0;
-	bool test=false;
 	
 	struct node
 	{
@@ -19,20 +18,18 @@ namespace auto_dao
 		int oud,cnt;
 		std::function<void(int,
 						   int,int,int,float*,
-						   int,int,int,float*,
-						   bool)>                forward_f; // in out test
+						   int,int,int,float*)> forward_f;   // in out
 		std::function<void(int,
 						   int,int,int,float*,float*,
-						   int,int,int,float*)> backward_f; // in din dout
+						   int,int,int,float*)> backward_f;  // in din dout
 		std::function<void(int,
 						   int,int,int,float*,
 						   int,int,int,float*,
-						   int,int,int,float*,
-						   bool)>               forward_f2; // in1 in2 out test
+						   int,int,int,float*)> forward_f2;  // in1 in2 out
 		std::function<void(int,
 						   int,int,int,float*,float*,
 						   int,int,int,float*,float*,
-						   int,int,int,float*)> backward_f2;// in1 din1 in2 din2 dout
+						   int,int,int,float*)> backward_f2; // in1 din1 in2 din2 dout
 		inline node(int td,int th,int tw);
 		inline ~node();
 		inline void forward();
@@ -41,10 +38,9 @@ namespace auto_dao
 	
 	std::vector<node*> tmp;
 	
-	inline void init(int BatchSize,bool flg_test)
+	inline void init(int BatchSize) // =0 for test
 	{
 		Batch_Size=BatchSize;
-		test=flg_test;
 		for(node *x:tmp) delete x;
 		tmp.clear();
 	}
@@ -80,9 +76,9 @@ inline float BCEloss(val3d x,float *realout);
 
 inline auto_dao::node::node(int td,int th,int tw)
 {
-	assert(Batch_Size!=0);
-	d=td,h=th,w=tw;
-	a=new float[Batch_Size*d*h*w],da=new float[Batch_Size*d*h*w];
+	d=td,h=th,w=tw; 
+	int bs=std::max(Batch_Size,1);
+	a=new float[bs*d*h*w],da=new float[bs*d*h*w];
 	in1=in2=0;
 	oud=cnt=0;
 	tmp.push_back(this);
@@ -95,20 +91,19 @@ inline void auto_dao::node::forward()
 	if(in1==0&&in2==0) return;
 	if(in2==0) forward_f(Batch_Size,
 						 in1->d,in1->h,in1->w,in1->a,
-						 d,h,w,a,
-						 test);
+						 d,h,w,a);
 	else
 	{
 		forward_f2(Batch_Size,
 				   in1->d,in1->h,in1->w,in1->a,
 				   in2->d,in2->h,in2->w,in2->a,
-				   d,h,w,a,
-				   test);
+				   d,h,w,a);
 	}
 }
 
 inline void auto_dao::node::backward()
 {
+	assert(Batch_Size!=0);
 	if(in2==0&&in1==0) return;
 	if(in2==0)
 	{
@@ -162,7 +157,7 @@ inline val3d::val3d(int td,int th,int tw,float val)
 	dat=new auto_dao::node(td,th,tw);
 	a=dat->a;
 	da=dat->da;
-	int bs=auto_dao::test?1:auto_dao::Batch_Size;
+	int bs=std::max(auto_dao::Batch_Size,1);
 	for(int i=0;i<bs*d*h*w;i++) a[i]=val;
 }
 
@@ -172,8 +167,8 @@ inline val3d::val3d(int td,int th,int tw,float *val)
 	dat=new auto_dao::node(td,th,tw);
 	a=dat->a;
 	da=dat->da;
-	int bs=auto_dao::test?1:auto_dao::Batch_Size;
-	for(int i=0;i<bs*d*h*w;i++) a[i]=val[i];
+	int bs=std::max(auto_dao::Batch_Size,1);
+	memcpy(a,val,sizeof(float)*bs*d*h*w);
 }
 
 inline void val3d::backward(){dat->backward();}
@@ -186,21 +181,21 @@ inline val3d reshape(val3d x,int d,int h,int w)
 	x.dat->oud++;
 	res.dat->forward_f=[&](int bs,
 	   int d1,int h1,int w1,float* a,
-	   int d2,int h2,int w2,float* res,
-	   bool test)
+	   int d2,int h2,int w2,float* res)
     {
         assert(bs==auto_dao::Batch_Size&&d1*h1*w1==d2*h2*w2);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a[ad+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f=[&](int bs,
 	   int d1,int h1,int w1,float* a,float *da,
 	   int d2,int h2,int w2,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size&&d1*h1*w1==d2*h2*w2);
 		for(int i=0;i<bs;i++)
 		{
@@ -219,10 +214,10 @@ inline val3d toshape(val3d x,int d,int h,int w)
 	x.dat->oud++;
 	res.dat->forward_f=[&](int bs,
 	   int d1,int h1,int w1,float* a,
-	   int d2,int h2,int w2,float* res,
-	   bool test)
+	   int d2,int h2,int w2,float* res)
     {
         assert(bs==auto_dao::Batch_Size);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad1=i*d1*h1*w1,ad2=i*d2*h2*w2;
@@ -238,13 +233,13 @@ inline val3d toshape(val3d x,int d,int h,int w)
 					}
 				}
 			}
-			if(test) break;
 		}
     };
 	res.dat->backward_f=[&](int bs,
 	   int d1,int h1,int w1,float* a,float *da,
 	   int d2,int h2,int w2,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size);
         memset(da,0,sizeof(float)*bs*d1*h1*w1);
 		for(int i=0;i<bs;i++)
@@ -279,18 +274,17 @@ inline val3d operator+(val3d x,val3d y)
 	res.dat->forward_f2=[&](int bs,
 	   int d1,int h1,int w1,float* a1,
 	   int d2,int h2,int w2,float* a2,
-	   int d3,int h3,int w3,float* res,
-	   bool test)
+	   int d3,int h3,int w3,float* res)
     {
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
 			 &&w1==w2&&w2==w3);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a1[ad+j]+a2[ad+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f2=[&](int bs,
@@ -298,6 +292,7 @@ inline val3d operator+(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
@@ -323,18 +318,17 @@ inline val3d operator-(val3d x,val3d y)
 	res.dat->forward_f2=[&](int bs,
 	   int d1,int h1,int w1,float* a1,
 	   int d2,int h2,int w2,float* a2,
-	   int d3,int h3,int w3,float* res,
-	   bool test)
+	   int d3,int h3,int w3,float* res)
     {
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
 			 &&w1==w2&&w2==w3);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a1[ad+j]-a2[ad+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f2=[&](int bs,
@@ -342,6 +336,7 @@ inline val3d operator-(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
@@ -367,18 +362,17 @@ inline val3d operator*(val3d x,val3d y)
 	res.dat->forward_f2=[&](int bs,
 	   int d1,int h1,int w1,float* a1,
 	   int d2,int h2,int w2,float* a2,
-	   int d3,int h3,int w3,float* res,
-	   bool test)
+	   int d3,int h3,int w3,float* res)
     {
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
 			 &&w1==w2&&w2==w3);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a1[ad+j]*a2[ad+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f2=[&](int bs,
@@ -386,6 +380,7 @@ inline val3d operator*(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
@@ -415,18 +410,17 @@ inline val3d operator/(val3d x,val3d y)
 	res.dat->forward_f2=[&](int bs,
 	   int d1,int h1,int w1,float* a1,
 	   int d2,int h2,int w2,float* a2,
-	   int d3,int h3,int w3,float* res,
-	   bool test)
+	   int d3,int h3,int w3,float* res)
     {
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
 			 &&w1==w2&&w2==w3);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a1[ad+j]/a2[ad+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f2=[&](int bs,
@@ -434,6 +428,7 @@ inline val3d operator/(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1==d2&&d2==d3
 		 	 &&h1==h2&&h2==h3
@@ -463,20 +458,19 @@ inline val3d dcat(val3d x,val3d y)
 	res.dat->forward_f2=[&](int bs,
 	   int d1,int h1,int w1,float* a1,
 	   int d2,int h2,int w2,float* a2,
-	   int d3,int h3,int w3,float* res,
-	   bool test)
+	   int d3,int h3,int w3,float* res)
     {
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1+d2==d3
 		 	 &&h1==h2&&h2==h3
 			 &&w1==w2&&w2==w3);
+		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
 			int ad1=i*d1*h1*w1,ad2=i*d2*h1*w1;
 			int ad=i*d3*h1*w1;
 			for(int j=0;j<d1*h1*w1;j++) res[ad+j]=a1[ad1+j];
 			for(int j=0;j<d2*h1*w1;j++) res[ad+d1*h1*w1+j]=a2[ad2+j];
-			if(test) break;
 		}
     };
 	res.dat->backward_f2=[&](int bs,
@@ -484,6 +478,7 @@ inline val3d dcat(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
+    	assert(bs!=0);
         assert(bs==auto_dao::Batch_Size
 	   	 	 &&d1+d2==d3
 		 	 &&h1==h2&&h2==h3
@@ -503,7 +498,7 @@ inline val3d dcat(val3d x,val3d y)
 inline float MSEloss(val3d x,float *realout)
 {
 	float res=0;
-	int bs=auto_dao::test?1:auto_dao::Batch_Size;
+	int bs=std::max(auto_dao::Batch_Size,1);
 	int n=bs*x.d*x.h*x.w;
 	for(int i=0;i<n;i++)
 	{
@@ -517,7 +512,7 @@ inline float MSEloss(val3d x,float *realout)
 inline float BCEloss(val3d x,float *realout)
 {
 	float res=0;
-	int bs=auto_dao::test?1:auto_dao::Batch_Size;
+	int bs=std::max(auto_dao::Batch_Size,1);
 	int n=bs*x.d*x.h*x.w;
 	for(int i=0;i<n;i++)
 	{

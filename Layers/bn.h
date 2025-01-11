@@ -58,14 +58,14 @@ public:
 	inline void delthis() { delete[] t_avg,delete[] t_var,delete[] e_avg,delete[] e_var; }
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
-						int od,int oh,int ow,float *out,
-						bool test)
+						int od,int oh,int ow,float *out)
 	{
-		assert(Batch_Size==bs&&d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
+		if(Batch_Size!=0) assert(Batch_Size==bs);
+		assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
 		for(int i=0;i<d;i++)
 		{
 			int siz=d*h*w,ad=i*h*w;
-			if(!test)
+			if(Batch_Size!=0)
 			{
 				float &avg=t_avg[i],&var=t_var[i];
 				avg=var=0;
@@ -131,8 +131,7 @@ public:
 			this,
 			pch(1),
 			pch(2),pch(3),pch(4),pch(5),
-			pch(6),pch(7),pch(8),pch(9),
-			pch(10));
+			pch(6),pch(7),pch(8),pch(9));
 		res.dat->backward_f=std::bind(
 			std::remove_reference<decltype(*this)>::type::backward,
 			this,

@@ -109,12 +109,12 @@ public:
 	}
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
-						int od,int oh,int ow,float *out,
-						bool test)
+						int od,int oh,int ow,float *out)
 	{
-		assert(Batch_Size==bs&&ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow);
+		if(Batch_Size!=0) assert(Batch_Size==bs);
+		assert(ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow);
 		getmem();
-		if(!test)
+		if(Batch_Size!=0)
 		{
 			#ifdef ENABLE_OPENMP
 				#pragma omp parallel for schedule(static) num_threads(THREAD_NUM)
@@ -195,8 +195,7 @@ public:
 			this,
 			pch(1),
 			pch(2),pch(3),pch(4),pch(5),
-			pch(6),pch(7),pch(8),pch(9),
-			pch(10));
+			pch(6),pch(7),pch(8),pch(9));
 		res.dat->backward_f=std::bind(
 			std::remove_reference<decltype(*this)>::type::backward,
 			this,

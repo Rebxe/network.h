@@ -33,11 +33,11 @@ public:
 	}
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
-						int od,int oh,int ow,float *out,
-						bool test)
+						int od,int oh,int ow,float *out)
 	{
-		assert(Batch_Size==bs&&ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow);
-		for(int tb=0;tb<bs;tb++)
+		if(Batch_Size!=0) assert(Batch_Size==bs);
+		assert(ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow);
+		for(int tb=0;tb<std::max(Batch_Size,1);tb++)
 		{
 			int adi=tb*ind*inh*inw,ado=tb*ind*ouh*ouw;
 			for (int d = 0; d < ind; d++) for (int i = 0; i < inh; i++) for (int j = 0; j < inw; j++)
@@ -46,7 +46,6 @@ public:
 				int ad = d * ouh * ouw;
 				for (int k = 0; k < filx; k++) for (int l = 0; l < fily; l++) out[ado + ad + (i * filx + k) * ouw + j * fily + l] = pre;
 			}
-			if(test) break; 
 		}
 	}
 	inline void backward(int Batch_Size,
@@ -77,8 +76,7 @@ public:
 			this,
 			pch(1),
 			pch(2),pch(3),pch(4),pch(5),
-			pch(6),pch(7),pch(8),pch(9),
-			pch(10));
+			pch(6),pch(7),pch(8),pch(9));
 		res.dat->backward_f=std::bind(
 			std::remove_reference<decltype(*this)>::type::backward,
 			this,
