@@ -24,8 +24,5 @@
 
 typedef std::tuple<int,int,int> SHAPE3D; 
 
-#define MAX_POOLING    1
-#define MEAN_POOLING   2
-
 #define INIT_HE       1
 #define INIT_XAVIER   2

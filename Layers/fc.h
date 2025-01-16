@@ -8,7 +8,6 @@ class FC
 {
 public:
 	int bs, ins, ous;
-	bool ub;
 	float * w;
 
 private:
@@ -46,6 +45,8 @@ public:
 		init(nou,Batch_Size,INS,OUS);
 		initmem(wei,tmp);
 	}
+	
+private: 
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
@@ -80,6 +81,8 @@ public:
 			}
 		}
 	}
+
+public:
 	inline val3d operator()(val3d x)
 	{
 		val3d res(ous,1,1);

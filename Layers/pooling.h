@@ -4,6 +4,9 @@
 
 // Pooling Layer
 
+#define MAX_POOLING    1
+#define MEAN_POOLING   2
+
 class POOLING
 {
 public:
@@ -12,8 +15,6 @@ public:
 	int tpe;
 	int stx, sty;
 	int ouh, ouw;
-
-private:
 
 public:
 	inline void init(int Batch_Size, 
@@ -45,6 +46,8 @@ public:
 		readf(inf,Input),readf(inf,Core),readf(inf,Type),readf(inf,Stride);
 		init(Batch_Size,Input,Core,Type,Stride);
 	}
+
+private:
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
@@ -110,6 +113,8 @@ public:
 			}
 		}
 	}
+
+public:
 	inline val3d operator()(val3d x)
 	{
 		val3d res(ind,ouh,ouw);

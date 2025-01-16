@@ -28,10 +28,10 @@ inline void readimg(std::string path,int &d,int &h,int &w,float *img,float l=-1,
 	stbi_image_free(data);
 }
 
-inline void readimg(std::string path,float *res,float l=-1,float r=1)
+inline void readimg(std::string path,float *img,float l=-1,float r=1)
 {
 	int d,h,w;
-	readimg(path,d,h,w,res,l,r);
+	readimg(path,d,h,w,img,l,r);
 }
 
 inline void savejpg(std::string path,int d,int h,int w,float *img,float l=-1,float r=1,

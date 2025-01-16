@@ -101,6 +101,8 @@ public:
 			Padding);
 		initmem(wei,tmp);
 	}
+
+private: 
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
@@ -177,6 +179,8 @@ public:
 		#endif
 		freemem();
 	}
+
+public:
 	inline val3d operator()(val3d x)
 	{
 		val3d res(cnt,ouh,ouw);

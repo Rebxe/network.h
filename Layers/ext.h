@@ -31,6 +31,8 @@ public:
 		readf(inf,Input),readf(inf,Fill);
 		init(Batch_Size,Input,Fill);
 	}
+
+private:
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
@@ -65,6 +67,8 @@ public:
 			}
 		}
 	}
+
+public:
 	inline val3d operator()(val3d x)
 	{
 		val3d res(ind,ouh,ouw);

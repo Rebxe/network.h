@@ -56,6 +56,8 @@ public:
 		readf(inf,e_avg,d),readf(inf,e_var,d);
 	}
 	inline void delthis() { delete[] t_avg,delete[] t_var,delete[] e_avg,delete[] e_var; }
+
+private:
 	inline void forward(int Batch_Size,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
@@ -120,6 +122,8 @@ public:
 				}
 		}
 	}
+
+public:
 	inline val3d operator()(val3d x)
 	{
 		val3d res(x.d,x.h,x.w);
