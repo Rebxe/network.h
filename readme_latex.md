@@ -1,3 +1,5 @@
+- 2025.01.18 更新：去除了预设层级和优化器的成员变量 `int bs`，用户不再需要为每个层级和优化器都指定批大小，仅需在 `auto_dao::init()` 中指定即可；
+
 ### 简介
 
 基于 C++14 的仅头文件的神经网络库，代码可读，方便研究神经网络的实现。
@@ -99,7 +101,7 @@ $x$ 是输出，$r$ 是真实数据：
 $$
 loss=-\frac{1}{n}\sum\limits_{i=1}^nr_i\ln(x_i)+(1-r_i)\ln(1-x_i)
 $$
-注意 $x_i$ 会被限制在 $[10^{-7},1-10^{-7}]$ 内以防止出现 `inf/nan`，若超出范围则偏导为 $0$。
+注意 $x_i$ 会被限制在 $[10^{-7},1-10^{-7}]$ 内以防止出现 `inf` 或 `nan`，若超出范围则偏导为 $0$。
 
 
 
@@ -111,7 +113,7 @@ float arr[2*2*2]={0.1,0.2,
 
                   0.1,0.2,
                   0.3,0.4};
-auto_dao::init(1,false); // 准备前向过程，批大小 1，当前是训练阶段 
+auto_dao::init(1);  // 准备前向过程，批大小 1，当前是训练阶段 
 val3d x(1,2,2,0.5); // 创建一个 1*2*2 的三维张量，每一位的值都是 0.5 
 val3d y(1,2,2,0.6); // 创建一个 1*2*2 的三维张量，每一位的值都是 0.6
 val3d z(2,2,2,arr); // 根据 arr 中的值创建一个 2*2*2 的三维张量
@@ -157,21 +159,20 @@ for(int i=0;i<2*2*2;i++) printf("%.2f ",z.da[i]);printf("\n");
 
 统一公有成员：
 
-|                       成员                       |                          含义/作用                           |
-| :----------------------------------------------: | :----------------------------------------------------------: |
-|                     `int bs`                     |                            批大小                            |
-|                     `int m`                      |                           权重数量                           |
-|                   `float lrt`                    |                            学习率                            |
-| `void init(int Batch_Size,float Learn_Rate,...)` | 初始化优化器参数，该函数的前两个参数及含义固定（批大小和学习率），根据不同优化器具体情况可能有更多参数 |
-|                  `void build()`                  |           初始化优化器，为权重及其偏导分配内存空间           |
-|         `void save(std::ofstream& ouf)`          | 将优化器参数（不包括批大小）及权重保存到二进制文件流 `ouf` 中 |
-|  `void load(std::ifstream& inf,int Batch_Size)`  | 从二进制文件流 `inf` 中读取优化器参数及权重，并将批大小初始化为 `Batch_Size` |
-|                 `void delthis()`                 |                      释放申请的内存空间                      |
-|                 `float* _wei()`                  |                     获取权重数组起始地址                     |
-|                 `float* _tmp()`                  |                     获取偏导数组起始地址                     |
-|              `void init_backward()`              |        清空累计的偏导，即将偏导数组置零，准备反向传播        |
-|                  `void flush()`                  |       利用当前累计的偏导更新权重，在反向传播完成后调用       |
-|                   默认构造函数                   | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|               成员                |                          含义/作用                           |
+| :-------------------------------: | :----------------------------------------------------------: |
+|              `int m`              |                           权重数量                           |
+|            `float lrt`            |                            学习率                            |
+| `void init(float Learn_Rate,...)` | 初始化优化器参数，该函数的第一个参数及含义固定，为学习率，根据不同优化器具体情况可能有更多参数 |
+|          `void build()`           |           初始化优化器，为权重及其偏导分配内存空间           |
+|  `void save(std::ofstream& ouf)`  |        将优化器参数及权重保存到二进制文件流 `ouf` 中         |
+|  `void load(std::ifstream& inf)`  |         从二进制文件流 `inf` 中读取优化器参数及权重          |
+|         `void delthis()`          |                      释放申请的内存空间                      |
+|          `float* _wei()`          |                     获取权重数组起始地址                     |
+|          `float* _tmp()`          |                     获取偏导数组起始地址                     |
+|      `void init_backward()`       |        清空累计的偏导，即将偏导数组置零，准备反向传播        |
+|          `void flush()`           |       利用当前累计的偏导更新权重，在反向传播完成后调用       |
+|           默认构造函数            | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 参数命名规则和主流的神经网络库大致相同。
 
@@ -201,7 +202,7 @@ $$
 |                          `float b1`                          |                  参数更新公式中的 $\beta_1$                  |
 |                          `float b2`                          |                  参数更新公式中的 $\beta_2$                  |
 |                         `float eps`                          | 参数更新公式中的 $\epsilon$，一个很小的非负实数，防止除以 $0$ |
-| `void init(int Batch_Size,float Learn_Rate,float beta1=0.9,float beta2=0.999,float Eps=1e-8)` | 初始化优化器参数，`b1`，`b2` 和 `eps` 分别初始化为 `beta1`，`beta2` 和 `Eps` |
+| `void init(float Learn_Rate,float beta1=0.9,float beta2=0.999,float Eps=1e-8)` | 初始化优化器参数，`b1`，`b2` 和 `eps` 分别初始化为 `beta1`，`beta2` 和 `Eps` |
 
 参数更新方式：（$w$ 为参数，$\Delta$ 为偏导）
 
@@ -226,28 +227,26 @@ $$
 
 统一公有成员：（有可训练权重）
 
-|                             成员                             |                          含义/作用                           |
-| :----------------------------------------------------------: | :----------------------------------------------------------: |
-|                           `int bs`                           |                            批大小                            |
-|            `void init(int& m,int Batch_Size,...)`            | 初始化层级参数，该函数前两个参数及其含义固定，其中 `m` 是权重计数器（用于统计权重数量，一般传入优化器的 `m`），`Batch_Size` 是批大小。根据不同层级的具体情况可能有更多参数 |
-|          `void build(float*& wei,float*& tmp,...)`           | 为层级分配权重、偏导储存空间并初始化权重，其中 `wei` 为权重储存起始地址，`tmp` 为偏导储存起始地址 |
-|               `void save(std::ofstream& ouf)`                | 将层级参数（不包括批大小）保存到二进制文件流 `ouf` 中，权重并不会被保存 |
-| `void load(std::ifstream& inf, int Batch_Size,float*& wei,float*& tmp)` | 从二进制文件流 `inf` 中读取层级参数，并根据 `wei` 和 `tmp` 为层级分配权重[*](#load()) |
-|                 `val3d operator()(val3d x)`                  |         在三维张量 `x` 上应用该层级的操作并返回结果          |
-|                         默认构造函数                         | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|                          成员                           |                          含义/作用                           |
+| :-----------------------------------------------------: | :----------------------------------------------------------: |
+|                 `void init(int& m,...)`                 | 初始化层级参数，该函数第一个参数及其含义固定，为权重计数器（用于统计权重数量，一般传入优化器的 `m`）。根据不同层级的具体情况可能有更多参数 |
+|        `void build(float*& wei,float*& tmp,...)`        | 为层级分配权重、偏导储存空间并初始化权重，其中 `wei` 为权重储存起始地址，`tmp` 为偏导储存起始地址 |
+|             `void save(std::ofstream& ouf)`             |   将层级参数保存到二进制文件流 `ouf` 中，权重并不会被保存    |
+| `void load(std::ifstream& inf,float*& wei,float*& tmp)` | 从二进制文件流 `inf` 中读取层级参数，并根据 `wei` 和 `tmp` 为层级分配权重[*](#load()) |
+|               `val3d operator()(val3d x)`               |         在三维张量 `x` 上应用该层级的操作并返回结果          |
+|                      默认构造函数                       | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 <span id="load()">*</span>：`wei` 为权重数组起始地址，`tmp` 为偏导数组起始地址，层级将会从 `wei` 中获取其权重并分配空间（这要求优化器的 `load()` 函数已经被调用）。
 
 统一公有成员：（无可训练权重）
 
-|                      成员                       |                          含义/作用                           |
-| :---------------------------------------------: | :----------------------------------------------------------: |
-|                    `int bs`                     |                            批大小                            |
-|         `void init(int Batch_Size,...)`         | 初始化层级参数，该函数第一个参数 `Batch_Size` 及其含义固定（批大小），根据不同层级的具体情况可能有更多参数 |
-|         `void save(std::ofstream& ouf)`         |    将层级参数（不包括批大小）保存到二进制文件流 `ouf` 中     |
-| `void load(std::ifstream& inf, int Batch_Size)` |             从二进制文件流 `inf` 中读取层级参数              |
-|           `val3d operator()(val3d x)`           |         在三维张量 `x` 上应用该层级的操作并返回结果          |
-|                  默认构造函数                   | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|              成员               |                          含义/作用                           |
+| :-----------------------------: | :----------------------------------------------------------: |
+|        `void init(...)`         |     初始化层级参数，根据不同层级的具体情况可能有更多参数     |
+| `void save(std::ofstream& ouf)` |            将层级参数保存到二进制文件流 `ouf` 中             |
+| `void load(std::ifstream& inf)` |             从二进制文件流 `inf` 中读取层级参数              |
+|   `val3d operator()(val3d x)`   |         在三维张量 `x` 上应用该层级的操作并返回结果          |
+|          默认构造函数           | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 
 
@@ -262,7 +261,7 @@ $$
 |                         `int ins`                          |                          输入值个数                          |
 |                         `int ous`                          |                          输出值个数                          |
 |                         `float* w`                         |                       权重存储起始地址                       |
-|     `void init(int& m,int Batch_Size,int INS,int OUS)`     | 初始化层级参数，额外将 `ins` 和 `ous` 初始化为 `INS` 和 `OUS` |
+|            `void init(int& m,int INS,int OUS)`             | 初始化层级参数，额外将 `ins` 和 `ous` 初始化为 `INS` 和 `OUS` |
 | `void build(float*& wei,float*& tmp,int InitType=INIT_HE)` | 为层级分配权重、偏导储存空间并按照 `InitType` 的方式初始化 `w`（`Xavier` 或 `HE`） |
 
 `FC` 层将会接受大小满足 `d*h*w=ins` 的三维张量输入，并按照 `w` 加权求和后变换为大小为 `ous*1*1` 的三维张量。
@@ -275,14 +274,14 @@ $$
 
 定义了偏置层类型 `BIAS`，其特殊成员如下：
 
-|                       成员                       |                         含义/作用                         |
-| :----------------------------------------------: | :-------------------------------------------------------: |
-|                     `int d`                      |                     输入张量的通道数                      |
-|                     `int h`                      |                      输入张量的高度                       |
-|                     `int w`                      |                      输入张量的宽度                       |
-|                    `float* b`                    |                     权重存储起始地址                      |
-| `void init(int& m,int Batch_Size,SHAPE3D Input)` | 初始化层级参数，额外利用 `Input` 的三维大小初始化 `d,h,w` |
-|      `void build(float*& wei,float*& tmp)`       |    为层级分配权重、偏导储存空间，将 `b` 初始化为全 $0$    |
+|                 成员                  |                         含义/作用                         |
+| :-----------------------------------: | :-------------------------------------------------------: |
+|                `int d`                |                     输入张量的通道数                      |
+|                `int h`                |                      输入张量的高度                       |
+|                `int w`                |                      输入张量的宽度                       |
+|              `float* b`               |                     权重存储起始地址                      |
+|   `void init(int& m,SHAPE3D Input)`   | 初始化层级参数，额外利用 `Input` 的三维大小初始化 `d,h,w` |
+| `void build(float*& wei,float*& tmp)` |    为层级分配权重、偏导储存空间，将 `b` 初始化为全 $0$    |
 
 `BIAS` 层将会接受大小为 `d*h*w` 的三维张量输入，并为第 $i$ 个通道的所有值增加 `b[i]` 的偏置后输出。
 
@@ -316,7 +315,7 @@ $$
 <span id="CONV::init()">*</span>：`init()` 函数将初始化卷积层参数并计算出 `ouh` 和 `ouw`，详细声明及特殊参数含义如下：
 
 ```cpp
-void init(int& m,int Batch_Size, 
+void init(int& m,
     SHAPE3D Input,
     int CoreCnt,std::pair<int,int> Core,
     std::pair<int,int> Stride={1,1},
@@ -371,8 +370,7 @@ void init(int& m,int Batch_Size,
 <span id="POOLING::init()">*</span>：`init()` 函数将初始化池化层参数并计算出 `ouh` 和 `ouw`，详细声明及特殊参数含义如下：
 
 ```cpp
-inline void init(int Batch_Size,
-    SHAPE3D Input,
+inline void init(SHAPE3D Input,
     std::pair<int,int> Core,
     int Type=MAX_POOLING,
     std::pair<int,int> Stride={-1,-1})
@@ -397,16 +395,16 @@ inline void init(int Batch_Size,
 
 定义了拓展层类型 `EXT`，其效果是将每个位置的值在原地复制若干份（变胖），特殊成员如下：
 
-|                             成员                             |                          含义/作用                           |
-| :----------------------------------------------------------: | :----------------------------------------------------------: |
-|                          `int ind`                           |                       输入张量的通道数                       |
-|                          `int inh`                           |                        输入张量的高度                        |
-|                          `int inw`                           |                        输入张量的宽度                        |
-|                          `int filx`                          |                           填充高度                           |
-|                          `int fily`                          |                           填充宽度                           |
-|                          `int ouh`                           |                        输出张量的高度                        |
-|                          `int ouw`                           |                        输出张量的宽度                        |
-| `void init(int Batch_Size,SHAPE3D Input,std::pair<int,int> Fill)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `ind,inh,inw`，使用 `Fill` 两维的值分别初始化 `filx` 和 `fily` |
+|                        成员                        |                          含义/作用                           |
+| :------------------------------------------------: | :----------------------------------------------------------: |
+|                     `int ind`                      |                       输入张量的通道数                       |
+|                     `int inh`                      |                        输入张量的高度                        |
+|                     `int inw`                      |                        输入张量的宽度                        |
+|                     `int filx`                     |                           填充高度                           |
+|                     `int fily`                     |                           填充宽度                           |
+|                     `int ouh`                      |                        输出张量的高度                        |
+|                     `int ouw`                      |                        输出张量的宽度                        |
+| `void init(SHAPE3D Input,std::pair<int,int> Fill)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `ind,inh,inw`，使用 `Fill` 两维的值分别初始化 `filx` 和 `fily` |
 
 调用 `init()` 函数后将自动初始化 `ouh=inh*filx, ouw=inw*fily`。
 
@@ -431,7 +429,7 @@ inline void init(int Batch_Size,
 |                          `float* b`                          |                       偏置数组起始地址                       |
 |                        `float* e_avg`                        |             均值的滑动平均，用于测试时的前向过程             |
 |                        `float* e_var`                        |             方差的滑动平均，用于测试时的前向过程             |
-| `void init(int& m,int Batch_Size,SHAPE3D Input,float Delta=0.9,float EPS=1e-4)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w`，使用 `Delta` 和 `EPS` 分别初始化 `delta` 和 `eps` |
+| `void init(int& m,SHAPE3D Input,float Delta=0.9,float EPS=1e-4)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w`，使用 `Delta` 和 `EPS` 分别初始化 `delta` 和 `eps` |
 |            `void build(float*& wei,float*& tmp)`             | 为层级分配权重、偏导储存空间并将 `k` 和 `e_var` 初始化为全 $1$，`b` 和 `e_avg` 初始化为全 $0$ |
 
 `BN` 层将会**对所有批的输入数据一起操作**，为输入张量的每个通道做批归一化，而输出的三维张量形状不变。具体的，假设这是第 $i$ 个通道，将通道内部所有位置所有批的值拿出来放入数组 $a$ 中（假设共 $n$ 个），则在训练阶段得到对应的输出 $\overline{a}$ 的流程为：
@@ -457,18 +455,18 @@ $$
 
 定义了组归一化层类型 `GN`，特殊成员如下：
 
-|                             成员                             |                          含义/作用                           |
-| :----------------------------------------------------------: | :----------------------------------------------------------: |
-|                           `int d`                            |                       输入张量的通道数                       |
-|                           `int h`                            |                        输入张量的高度                        |
-|                           `int w`                            |                        输入张量的宽度                        |
-|                           `int g`                            |                         每组的通道数                         |
-|                         `float eps`                          |      极小量 $\epsilon$，防止让方差变得很小以至于除以零       |
-|                          `int cnt`                           |                             组数                             |
-|                          `float* k`                          |                       系数数组起始地址                       |
-|                          `float* b`                          |                       偏置数组起始地址                       |
-| `void init(int& m,int Batch_Size,SHAPE3D Input,float EPS=1e-4)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w`，使用 `EPS` 初始化 `eps` |
-|            `void build(float*& wei,float*& tmp)`             | 为层级分配权重、偏导储存空间并将 `k` 初始化为全 $1$，`b` 初始化为全 $0$ |
+|                       成员                       |                          含义/作用                           |
+| :----------------------------------------------: | :----------------------------------------------------------: |
+|                     `int d`                      |                       输入张量的通道数                       |
+|                     `int h`                      |                        输入张量的高度                        |
+|                     `int w`                      |                        输入张量的宽度                        |
+|                     `int g`                      |                         每组的通道数                         |
+|                   `float eps`                    |      极小量 $\epsilon$，防止让方差变得很小以至于除以零       |
+|                    `int cnt`                     |                             组数                             |
+|                    `float* k`                    |                       系数数组起始地址                       |
+|                    `float* b`                    |                       偏置数组起始地址                       |
+| `void init(int& m,SHAPE3D Input,float EPS=1e-4)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w`，使用 `EPS` 初始化 `eps` |
+|      `void build(float*& wei,float*& tmp)`       | 为层级分配权重、偏导储存空间并将 `k` 初始化为全 $1$，`b` 初始化为全 $0$ |
 
 调用 `init()` 函数后将自动初始化 `cnt=d/g+(d%g!=0)`。
 
@@ -484,12 +482,12 @@ $$
 
 定义了 Softmax 归一化层类型 `SOFTMAX`，特殊成员如下：
 
-|                   成员                    |                        含义/作用                        |
-| :---------------------------------------: | :-----------------------------------------------------: |
-|                  `int d`                  |                    输入张量的通道数                     |
-|                  `int h`                  |                     输入张量的高度                      |
-|                  `int w`                  |                     输入张量的宽度                      |
-| `void init(int Batch_Size,SHAPE3D Input)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w` |
+|            成员            |                        含义/作用                        |
+| :------------------------: | :-----------------------------------------------------: |
+|          `int d`           |                    输入张量的通道数                     |
+|          `int h`           |                     输入张量的高度                      |
+|          `int w`           |                     输入张量的宽度                      |
+| `void init(SHAPE3D Input)` | 初始化层级参数，使用 `Input` 三维的值分别初始化 `d,h,w` |
 
 `SOFTMAX` 层将会对输入张量沿着通道做 Softmax 操作，输出张量三维形状不变，即对于位置 $x,y$ 上的 $d$ 个值，设其分别为 $a_{[1,d]}$，则输出 $\overline a_{[1,d]}$ 的计算方法如下：
 $$
@@ -501,10 +499,10 @@ $$
 
 公共特殊成员：
 
-|                  成员                   |                          含义/作用                           |
-| :-------------------------------------: | :----------------------------------------------------------: |
-|                `int siz`                |                  输入张量的大小（`d*h*w`）                   |
-| `void init(int Batch_Size,int Siz,...)` | 初始化层级参数，前两个参数及其含义固定，使用 `Siz` 初始化 `siz`，若有更多参数将给出说明 |
+|           成员           |                          含义/作用                           |
+| :----------------------: | :----------------------------------------------------------: |
+|        `int siz`         |                  输入张量的大小（`d*h*w`）                   |
+| `void init(int Siz,...)` | 初始化层级参数，第一个参数及其含义固定，使用 `Siz` 初始化 `siz`，若有更多参数将给出说明 |
 
 各种激活函数层将对输入张量的每个数值分别应用对应的激活函数 $f$，即 $x_{\text{out}}=f(x_{\text{in}})$，输出张量三维形状不变。
 
@@ -525,10 +523,10 @@ $$
 
 定义了 Leaky_ReLU 层类型 `LEAKY_RELU`，其特殊成员如下：
 
-|                         成员                         |                  含义/作用                  |
-| :--------------------------------------------------: | :-----------------------------------------: |
-|                      `float a`                       |       激活函数 $f$ 中的参数 $\alpha$        |
-| `void init(int Batch_Size,int Siz,float Alpha=0.01)` | 初始化层级参数，额外使用 `Alpha` 初始化 `a` |
+|                 成员                  |                  含义/作用                  |
+| :-----------------------------------: | :-----------------------------------------: |
+|               `float a`               |       激活函数 $f$ 中的参数 $\alpha$        |
+| `void init(int Siz,float Alpha=0.01)` | 初始化层级参数，额外使用 `Alpha` 初始化 `a` |
 
 激活函数表达式如下：
 $$
@@ -583,7 +581,7 @@ AUTO_SL_END
 }test;
 ```
 
-使用 `test.save(path)` 和 `test.load(path,Batch_Size)` 以保存到文件或从文件中读取。
+使用 `test.save(path)` 和 `test.load(path)` 以保存到文件或从文件中读取。
 
 使用 `test.delthis()` 以释放该神经网络类预设优化器及各预设层级占用的内存空间。
 
@@ -650,7 +648,7 @@ AUTO_SL_OPTIMIZER_CONSTRUCTER(classname)
 #define THREAD_NUM 6
 #define ENABLE_AUTO_SL
 
-#include "./network_h/network.h"
+#include "../../network_h/network.h"
 
 using namespace std;
 
@@ -688,25 +686,25 @@ struct NETWORK
 	
 	inline void init()
 	{
-		opt.init(Batch_Size, lrt);
+		opt.init(lrt);
 		
-		c1.init(opt.m,Batch_Size,(SHAPE3D){1,28,28},8,{3,3},{1,1},{1,1},0);
-		b1.init(opt.m,Batch_Size,(SHAPE3D){8,28,28});
-		a1.init(Batch_Size,8*28*28);
-		p1.init(Batch_Size,(SHAPE3D){8,28,28},{2,2});
+		c1.init(opt.m,(SHAPE3D){1,28,28},8,{3,3},{1,1},{1,1},0);
+		b1.init(opt.m,(SHAPE3D){8,28,28});
+		a1.init(8*28*28);
+		p1.init((SHAPE3D){8,28,28},{2,2});
 		
-		c2.init(opt.m,Batch_Size,(SHAPE3D){8,14,14},16,{3,3},{1,1},{1,1},0);
-		b2.init(opt.m,Batch_Size,(SHAPE3D){16,14,14});
-		a2.init(Batch_Size,16*14*14);
-		p2.init(Batch_Size,(SHAPE3D){16,14,14},{2,2});
+		c2.init(opt.m,(SHAPE3D){8,14,14},16,{3,3},{1,1},{1,1},0);
+		b2.init(opt.m,(SHAPE3D){16,14,14});
+		a2.init(16*14*14);
+		p2.init((SHAPE3D){16,14,14},{2,2});
 		
-		fc1.init(opt.m,Batch_Size,16*7*7,128);
-		bi1.init(opt.m,Batch_Size,(SHAPE3D){128,1,1});
-		a3.init(Batch_Size,128);
+		fc1.init(opt.m,16*7*7,128);
+		bi1.init(opt.m,(SHAPE3D){128,1,1});
+		a3.init(128);
 		
-		fc2.init(opt.m,Batch_Size,128,10);
-		bi2.init(opt.m,Batch_Size,(SHAPE3D){10,1,1});
-		sfm1.init(Batch_Size,(SHAPE3D){10,1,1});
+		fc2.init(opt.m,128,10);
+		bi2.init(opt.m,(SHAPE3D){10,1,1});
+		sfm1.init((SHAPE3D){10,1,1});
 		
 		opt.build();
 		
@@ -802,7 +800,7 @@ int main()
 {
 	printf("模式选择：\n");
 	printf("[1] 加载 AI 并测试\n");
-	printf("[2] 训练 AI（最好的 AI 模型将会保存到 .\\best.ai）\n");
+	printf("[2] 训练 AI（最好的 AI 模型将会保存到 ./best.ai）\n");
 	int mode;
 	scanf("%d", &mode);
 	system("cls");
@@ -819,7 +817,7 @@ int main()
 		printf("请输入之前保存的 AI 路径\n");
 		string path;
 		cin >> path;
-		brn.load(path,1);
+		brn.load(path);
 	}
 	else
 	{
