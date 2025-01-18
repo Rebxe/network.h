@@ -7,7 +7,7 @@
 class CONV
 {
 public:
-	int bs, ind, inh, inw;
+	int ind, inh, inw;
 	int cnt, ch, cw;
 	int stx, sty;
 	int pdx, pdy;
@@ -57,13 +57,12 @@ private:
 	}
 
 public:
-	inline void init(int &m, int Batch_Size, 
+	inline void init(int &m, 
 		SHAPE3D Input,
 		int CoreCnt, std::pair<int,int> Core,
 		std::pair<int,int> Stride = {1,1},
 		std::pair<int,int> Padding = {0,0}, float PaddingVal = 0)
 	{
-		bs = Batch_Size;
 		ind=std::get<0>(Input),inh=std::get<1>(Input),inw=std::get<2>(Input),
 		cnt = CoreCnt, ch = Core.first, cw = Core.second;
 		stx = Stride.first, sty = Stride.second;
@@ -89,7 +88,7 @@ public:
 		writf(ouf,std::make_pair(stx,sty));
 		writf(ouf,std::make_pair(pdx,pdy)),writf(ouf,pdval);
 	}
-	inline void load(std::ifstream& inf, int Batch_Size,float *&wei, float *&tmp)
+	inline void load(std::ifstream& inf,float *&wei, float *&tmp)
 	{
 		SHAPE3D Input;
 		int CoreCnt;
@@ -100,7 +99,7 @@ public:
 		readf(inf,Stride);
 		readf(inf,Padding),readf(inf,PaddingVal);
 		int nou=0;
-		init(nou,Batch_Size,
+		init(nou,
 			Input,
 			CoreCnt,Core,
 			Stride,
@@ -109,14 +108,20 @@ public:
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow);
+		ext_assert(ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow,
+			fprintf(stderr,"\
+In CONV::forward(...)\n\
+  in  = [%d * %d * %d]\n\
+  out = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ind,inh,inw,cnt,ouh,ouw,id,ih,iw,od,oh,ow));
 		getmem();
-		if(Batch_Size!=0)
+		if(bs!=0)
 		{
 			#ifdef ENABLE_OPENMP
 				#pragma omp parallel for schedule(static) num_threads(THREAD_NUM)
@@ -148,15 +153,22 @@ private:
 		}
 		freemem();
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow);
+		ext_assert(ind==id&&inh==ih&&inw==iw&&cnt==od&&ouh==oh&&ouw==ow,
+			fprintf(stderr,"\
+In CONV::backward(...)\n\
+  in  = [%d * %d * %d]\n\
+  out = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ind,inh,inw,cnt,ouh,ouw,id,ih,iw,od,oh,ow));
 		getmem();
 		memset(din,0,sizeof(float)*bs*ind*inh*inw);
 		#ifdef ENABLE_OPENMP
-			for(int i=0;i<THREAD_NUM;i++) memset(ttmpw[i],0,sizeof(float)*ind * ch * cw * cnt);
+			for(int i=0;i<THREAD_NUM;i++) memset(ttmpw[i],0,sizeof(float)*ind*ch*cw*cnt);
 			#pragma omp parallel for schedule(static) num_threads(THREAD_NUM)
 		#endif
 		for(int tb=0;tb<bs;tb++)

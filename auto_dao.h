@@ -6,6 +6,8 @@
 #include <cstring>
 #include <cmath>
 
+#include "defines.h"
+
 namespace auto_dao
 {
 	int Batch_Size=0;
@@ -18,18 +20,18 @@ namespace auto_dao
 		int oud,cnt;
 		std::function<void(int,
 						   int,int,int,float*,
-						   int,int,int,float*)> forward_f;   // in out
+						   int,int,int,float*)> forward_f;   // bs in out
 		std::function<void(int,
 						   int,int,int,float*,float*,
-						   int,int,int,float*)> backward_f;  // in din dout
+						   int,int,int,float*)> backward_f;  // bs in din dout
 		std::function<void(int,
 						   int,int,int,float*,
 						   int,int,int,float*,
-						   int,int,int,float*)> forward_f2;  // in1 in2 out
+						   int,int,int,float*)> forward_f2;  // bs in1 in2 out
 		std::function<void(int,
 						   int,int,int,float*,float*,
 						   int,int,int,float*,float*,
-						   int,int,int,float*)> backward_f2; // in1 din1 in2 din2 dout
+						   int,int,int,float*)> backward_f2; // bs in1 din1 in2 din2 dout
 		inline node(int td,int th,int tw);
 		inline ~node();
 		inline void forward();
@@ -103,7 +105,6 @@ inline void auto_dao::node::forward()
 
 inline void auto_dao::node::backward()
 {
-	assert(Batch_Size!=0);
 	if(in2==0&&in1==0) return;
 	if(in2==0)
 	{
@@ -171,11 +172,20 @@ inline val3d::val3d(int td,int th,int tw,float *val)
 	memcpy(a,val,sizeof(float)*bs*d*h*w);
 }
 
-inline void val3d::backward(){dat->backward();}
+inline void val3d::backward()
+{
+	ext_assert(auto_dao::Batch_Size!=0,fprintf(stderr,"Backward is not allowed when testing\n\n"));
+	dat->backward();
+}
 
 inline val3d reshape(val3d x,int d,int h,int w)
 {
-	assert(x.d*x.h*x.w==d*h*w);
+	ext_assert(x.d*x.h*x.w==d*h*w,
+		fprintf(stderr,"\
+In val3d reshape(val3d,int,int,int)\n\
+  Input = [%d * %d * %d] = %d\n\
+But\n\
+  Output = [%d * %d * %d] = %d\n\n",x.d,x.h,x.w,x.d*x.h*x.w,d,h,w,d*h*w));
 	val3d res(d,h,w);
 	res.dat->in1=x.dat;
 	x.dat->oud++;
@@ -183,7 +193,6 @@ inline val3d reshape(val3d x,int d,int h,int w)
 	   int d1,int h1,int w1,float* a,
 	   int d2,int h2,int w2,float* res)
     {
-        assert(bs==auto_dao::Batch_Size&&d1*h1*w1==d2*h2*w2);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -195,8 +204,6 @@ inline val3d reshape(val3d x,int d,int h,int w)
 	   int d1,int h1,int w1,float* a,float *da,
 	   int d2,int h2,int w2,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size&&d1*h1*w1==d2*h2*w2);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
@@ -216,7 +223,6 @@ inline val3d toshape(val3d x,int d,int h,int w)
 	   int d1,int h1,int w1,float* a,
 	   int d2,int h2,int w2,float* res)
     {
-        assert(bs==auto_dao::Batch_Size);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -227,10 +233,7 @@ inline val3d toshape(val3d x,int d,int h,int w)
 				for(int k=0;k<h2;k++)
 				{
 					int adk=(k%h1)*w1;
-					for(int l=0;l<w2;l++)
-					{
-						res[ad2++]=a[ad1+adj+adk+(l%w1)];
-					}
+					for(int l=0;l<w2;l++) res[ad2++]=a[ad1+adj+adk+(l%w1)];
 				}
 			}
 		}
@@ -239,8 +242,6 @@ inline val3d toshape(val3d x,int d,int h,int w)
 	   int d1,int h1,int w1,float* a,float *da,
 	   int d2,int h2,int w2,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size);
         memset(da,0,sizeof(float)*bs*d1*h1*w1);
 		for(int i=0;i<bs;i++)
 		{
@@ -251,10 +252,7 @@ inline val3d toshape(val3d x,int d,int h,int w)
 				for(int k=0;k<h2;k++)
 				{
 					int adk=(k%h1)*w1;
-					for(int l=0;l<w2;l++)
-					{
-						da[ad1+adj+adk+(l%w1)]+=dres[ad2++];
-					}
+					for(int l=0;l<w2;l++) da[ad1+adj+adk+(l%w1)]+=dres[ad2++];
 				}
 			}
 		}
@@ -265,7 +263,11 @@ inline val3d toshape(val3d x,int d,int h,int w)
 
 inline val3d operator+(val3d x,val3d y)
 {
-	assert(x.d==y.d&&x.h==y.h&&x.w==y.w);
+	ext_assert(x.d==y.d&&x.h==y.h&&x.w==y.w,
+		fprintf(stderr,"\
+In val3d operator+(val3d x,val3d y)\n\
+  x = [%d * %d * %d]\n\
+  y = [%d * %d * %d]\n\n",x.d,x.h,x.w,y.d,y.h,y.w));
 	val3d res(x.d,x.h,x.w);
 	res.dat->in1=x.dat;
 	res.dat->in2=y.dat;
@@ -276,10 +278,6 @@ inline val3d operator+(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,
 	   int d3,int h3,int w3,float* res)
     {
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -292,11 +290,6 @@ inline val3d operator+(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
@@ -309,7 +302,11 @@ inline val3d operator+(val3d x,val3d y)
 
 inline val3d operator-(val3d x,val3d y)
 {
-	assert(x.d==y.d&&x.h==y.h&&x.w==y.w);
+	ext_assert(x.d==y.d&&x.h==y.h&&x.w==y.w,
+		fprintf(stderr,"\
+In val3d operator-(val3d x,val3d y)\n\
+  x = [%d * %d * %d]\n\
+  y = [%d * %d * %d]\n\n",x.d,x.h,x.w,y.d,y.h,y.w));
 	val3d res(x.d,x.h,x.w);
 	res.dat->in1=x.dat;
 	res.dat->in2=y.dat;
@@ -320,10 +317,6 @@ inline val3d operator-(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,
 	   int d3,int h3,int w3,float* res)
     {
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -336,11 +329,6 @@ inline val3d operator-(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
@@ -353,7 +341,11 @@ inline val3d operator-(val3d x,val3d y)
 
 inline val3d operator*(val3d x,val3d y)
 {
-	assert(x.d==y.d&&x.h==y.h&&x.w==y.w);
+	ext_assert(x.d==y.d&&x.h==y.h&&x.w==y.w,
+		fprintf(stderr,"\
+In val3d operator*(val3d x,val3d y)\n\
+  x = [%d * %d * %d]\n\
+  y = [%d * %d * %d]\n\n",x.d,x.h,x.w,y.d,y.h,y.w));
 	val3d res(x.d,x.h,x.w);
 	res.dat->in1=x.dat;
 	res.dat->in2=y.dat;
@@ -364,10 +356,6 @@ inline val3d operator*(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,
 	   int d3,int h3,int w3,float* res)
     {
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -380,11 +368,6 @@ inline val3d operator*(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
@@ -401,7 +384,11 @@ inline val3d operator*(val3d x,val3d y)
 
 inline val3d operator/(val3d x,val3d y)
 {
-	assert(x.d==y.d&&x.h==y.h&&x.w==y.w);
+	ext_assert(x.d==y.d&&x.h==y.h&&x.w==y.w,
+		fprintf(stderr,"\
+In val3d operator/(val3d x,val3d y)\n\
+  x = [%d * %d * %d]\n\
+  y = [%d * %d * %d]\n\n",x.d,x.h,x.w,y.d,y.h,y.w));
 	val3d res(x.d,x.h,x.w);
 	res.dat->in1=x.dat;
 	res.dat->in2=y.dat;
@@ -412,10 +399,6 @@ inline val3d operator/(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,
 	   int d3,int h3,int w3,float* res)
     {
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -428,11 +411,6 @@ inline val3d operator/(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1==d2&&d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		for(int i=0;i<bs;i++)
 		{
 			int ad=i*d1*h1*w1;
@@ -449,7 +427,11 @@ inline val3d operator/(val3d x,val3d y)
 
 inline val3d dcat(val3d x,val3d y)
 {
-	assert(x.h==y.h&&x.w==y.w);
+	ext_assert(x.h==y.h&&x.w==y.w,
+		fprintf(stderr,"\
+In val3d dcat(val3d x,val3d y)\n\
+  x = [%d * %d * %d]\n\
+  y = [%d * %d * %d]\n\n",x.d,x.h,x.w,y.d,y.h,y.w));
 	val3d res(x.d+y.d,x.h,x.w);
 	res.dat->in1=x.dat;
 	res.dat->in2=y.dat;
@@ -460,10 +442,6 @@ inline val3d dcat(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,
 	   int d3,int h3,int w3,float* res)
     {
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1+d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		bs=std::max(bs,1);
 		for(int i=0;i<bs;i++)
 		{
@@ -478,11 +456,6 @@ inline val3d dcat(val3d x,val3d y)
 	   int d2,int h2,int w2,float* a2,float *da2,
 	   int d3,int h3,int w3,float* dres)
     {
-    	assert(bs!=0);
-        assert(bs==auto_dao::Batch_Size
-	   	 	 &&d1+d2==d3
-		 	 &&h1==h2&&h2==h3
-			 &&w1==w2&&w2==w3);
 		for(int i=0;i<bs;i++)
 		{
 			int ad1=i*d1*h1*w1,ad2=i*d2*h1*w1;

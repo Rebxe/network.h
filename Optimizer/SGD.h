@@ -6,7 +6,7 @@
 class SGD
 {
 public:
-	int bs,m; // Count of weights
+	int m; // Count of weights
 	float lrt;
 
 private:
@@ -14,9 +14,8 @@ private:
 	inline void initmem(){wei=new float[m],tmp=new float[m];}
 
 public:
-	inline void init(int Batch_Size,float Learn_Rate)
+	inline void init(float Learn_Rate)
 	{
-		bs=Batch_Size; 
 		lrt=Learn_Rate;
 		m=0;
 	}
@@ -26,9 +25,8 @@ public:
 		writf(ouf,m),writf(ouf,lrt);
 		writf(ouf,wei,m);
 	}
-	inline void load(std::ifstream& inf,int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
-		bs=Batch_Size;
 		readf(inf,m),readf(inf,lrt);
 		initmem();
 		readf(inf,wei,m);

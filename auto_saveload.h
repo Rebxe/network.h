@@ -43,7 +43,7 @@
 namespace auto_sl
 {
 	typedef std::function<void(std::ofstream&)> SF;
-	typedef std::function<void(std::ifstream&,int,float*&,float*&)> LF;
+	typedef std::function<void(std::ifstream&,float*&,float*&)> LF;
 	typedef std::function<void()> DF;
 	typedef std::function<float*()> GET_ADD;
 	typedef std::vector<SF> VSF;
@@ -103,13 +103,13 @@ namespace auto_sl
 			_tmp=stk.back().second.second;
 			stk.pop_back();
 		}
-		inline void operator()(std::string path,int Batch_Size)
+		inline void operator()(std::string path)
 		{
 			std::ifstream inf(path,std::ios::in|std::ios::binary);
 			float *_1=NULL,*_2=NULL;
-			(*vlf)[0](inf,Batch_Size,_1,_2);
+			(*vlf)[0](inf,_1,_2);
 			float *wei=(*_wei)(),*tmp=(*_tmp)();
-			for(int i=1;i<(*vlf).size();i++) (*vlf)[i](inf,Batch_Size,wei,tmp);
+			for(int i=1;i<(*vlf).size();i++) (*vlf)[i](inf,wei,tmp);
 			inf.close();
 		}
 	};
@@ -128,8 +128,8 @@ namespace auto_sl
 	auto tmp=std::bind(\
 		std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4);\
-	auto loadf=[&,tmp](std::ifstream &i,int b,float *&_1,float *&_2){tmp(i,b,_1,_2);};\
+		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3);\
+	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i,_1,_2);};\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 	auto delf=std::bind(\
@@ -148,8 +148,8 @@ namespace auto_sl
 	auto tmp=std::bind(\
 		std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4);\
-	auto loadf=[&,tmp](std::ifstream &i,int b,float *&_1,float *&_2){tmp(i,b,_1,_2);};\
+		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3);\
+	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i,_1,_2);};\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 }
@@ -163,8 +163,8 @@ namespace auto_sl
 	auto tmp=std::bind(\
 		std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2);\
-	auto loadf=[&,tmp](std::ifstream &i,int b,float *&_1,float *&_2){tmp(i,b);};\
+		std::placeholders::_1);\
+	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 	auto delf=std::bind(\
@@ -183,8 +183,8 @@ namespace auto_sl
 	auto tmp=std::bind(\
 		std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2);\
-	auto loadf=[&,tmp](std::ifstream &i,int b,float *&_1,float *&_2){tmp(i,b);};\
+		std::placeholders::_1);\
+	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 }
@@ -198,8 +198,8 @@ namespace auto_sl
 	auto tmp=std::bind(\
 		std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2);\
-	auto loadf=[&,tmp](std::ifstream &i,int b,float *&_1,float *&_2){tmp(i,b);};\
+		std::placeholders::_1);\
+	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
 	auto delf=std::bind(\
 		std::remove_reference<decltype(*this)>::type::delthis,\
 		this\

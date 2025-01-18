@@ -7,36 +7,44 @@
 class RELU
 {
 public:
-	int bs,siz;
+	int siz;
 
 public:
-	inline void init(int Batch_Size,int Siz)
-	{
-		bs=Batch_Size;
-		siz=Siz;
-	}
+	inline void init(int Siz){siz=Siz;}
 	inline void save(std::ofstream& ouf){writf(ouf,siz);}
-	inline void load(std::ifstream& inf, int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
 		int Siz;
 		readf(inf,Siz);
-		init(Batch_Size,Siz);
+		init(Siz);
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(siz==id*ih*iw&&siz==od*oh*ow);
-		for(int i=0;i<std::max(Batch_Size,1)*siz;i++) out[i]=in[i]<0?0:in[i];
+		ext_assert(siz==id*ih*iw&&siz==od*oh*ow,
+			fprintf(stderr,"\
+In RELU::forward(...)\n\
+  siz = %d\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",siz,id,ih,iw,od,oh,ow));
+  		bs=std::max(bs,1);
+		for(int i=0;i<bs*siz;i++) out[i]=in[i]<0?0:in[i];
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&siz==id*ih*iw&&siz==od*oh*ow);
+		ext_assert(siz==id*ih*iw&&siz==od*oh*ow,
+			fprintf(stderr,"\
+In RELU::backward(...)\n\
+  siz = %d\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",siz,id,ih,iw,od,oh,ow));
 		for(int i=0;i<bs*siz;i++) din[i]=in[i]<0?0:dout[i];
 	}
 

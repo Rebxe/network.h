@@ -7,30 +7,32 @@
 class SOFTMAX
 {
 public:
-	int bs,d,h,w;
+	int d,h,w;
 
 public:
-	inline void init(int Batch_Size,SHAPE3D Input)
-	{
-		bs=Batch_Size;
-		d=std::get<0>(Input),h=std::get<1>(Input),w=std::get<2>(Input);
-	}
+	inline void init(SHAPE3D Input){d=std::get<0>(Input),h=std::get<1>(Input),w=std::get<2>(Input);}
 	inline void save(std::ofstream& ouf){writf(ouf,(SHAPE3D){d,h,w});}
-	inline void load(std::ifstream& inf, int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
 		SHAPE3D Input;
 		readf(inf,Input);
-		init(Batch_Size,Input);
+		init(Input);
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
-		for(int tb=0;tb<std::max(Batch_Size,1);tb++)
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In Softmax::forward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
+  		bs=std::max(bs,1);
+		for(int tb=0;tb<bs;tb++)
 		{
 			int adb=tb*d*h*w;
 			for(int i=0;i<h;i++)
@@ -45,11 +47,17 @@ private:
 			}
 		}
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In Softmax::backward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
 		for(int tb=0;tb<bs;tb++)
 		{
 			int adb=tb*d*h*w;

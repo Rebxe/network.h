@@ -7,14 +7,13 @@
 class EXT
 {
 public:
-	int bs, ind, inh, inw;
+	int ind, inh, inw;
 	int filx, fily;
 	int ouh, ouw;
 
 public:
-	inline void init(int Batch_Size,SHAPE3D Input,std::pair<int,int> Fill)
+	inline void init(SHAPE3D Input,std::pair<int,int> Fill)
 	{
-		bs = Batch_Size;
 		ind = std::get<0>(Input), inh = std::get<1>(Input), inw = std::get<2>(Input);
 		filx = Fill.first, fily = Fill.second;
 		ouh = inh * filx, ouw = inw * fily;
@@ -24,22 +23,30 @@ public:
 		writf(ouf,(SHAPE3D){ind,inh,inw});
 		writf(ouf,std::make_pair(filx,fily));
 	}
-	inline void load(std::ifstream& inf, int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
 		SHAPE3D Input;
 		std::pair<int,int> Fill;
 		readf(inf,Input),readf(inf,Fill);
-		init(Batch_Size,Input,Fill);
+		init(Input,Fill);
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
 		assert(ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow);
-		for(int tb=0;tb<std::max(Batch_Size,1);tb++)
+		ext_assert(ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow,
+			fprintf(stderr,"\
+In EXT::forward(...)\n\
+  in  = [%d * %d * %d]\n\
+  out = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ind,inh,inw,ind,ouh,ouw,id,ih,iw,od,oh,ow));
+		bs=std::max(bs,1);
+		for(int tb=0;tb<bs;tb++)
 		{
 			int adi=tb*ind*inh*inw,ado=tb*ind*ouh*ouw;
 			for (int d = 0; d < ind; d++) for (int i = 0; i < inh; i++) for (int j = 0; j < inw; j++)
@@ -50,11 +57,19 @@ private:
 			}
 		}
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow);
+		assert(ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow);
+		ext_assert(ind==id&&inh==ih&&inw==iw&&ind==od&&ouh==oh&&ouw==ow,
+			fprintf(stderr,"\
+In EXT::backward(...)\n\
+  in  = [%d * %d * %d]\n\
+  out = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ind,inh,inw,ind,ouh,ouw,id,ih,iw,od,oh,ow));
 		for(int tb=0;tb<bs;tb++)
 		{
 			int adi=tb*ind*inh*inw,ado=tb*ind*ouh*ouw;

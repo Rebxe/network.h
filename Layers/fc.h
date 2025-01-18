@@ -7,7 +7,7 @@
 class FC
 {
 public:
-	int bs, ins, ous;
+	int ins, ous;
 	float * w;
 
 private:
@@ -19,9 +19,8 @@ private:
 	}
 
 public:
-	inline void init(int &m, int Batch_Size, int INS, int OUS)
+	inline void init(int &m, int INS, int OUS)
 	{
-		bs = Batch_Size;
 		ins = INS, ous = OUS;
 		m+=ins*ous;
 	}
@@ -37,35 +36,48 @@ public:
 		for (int i = 0; i < ins * ous; i++) w[i] = wer(gen);
 	}
 	inline void save(std::ofstream& ouf){writf(ouf,ins),writf(ouf,ous);}
-	inline void load(std::ifstream& inf, int Batch_Size,float *&wei,float *&tmp)
+	inline void load(std::ifstream& inf,float *&wei,float *&tmp)
 	{
 		int INS,OUS;
 		readf(inf,INS),readf(inf,OUS);
 		int nou=0;
-		init(nou,Batch_Size,INS,OUS);
+		init(nou,INS,OUS);
 		initmem(wei,tmp);
 	}
 	
 private: 
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(ins==id*ih*iw&&ous==od*oh*ow);
-		if(Batch_Size==0) memset(out,0,sizeof(float) * ous);
-		else memset(out, 0, sizeof(float) * bs * ous);
-		for(int tb=0;tb<std::max(Batch_Size,1);tb++)
+		ext_assert(ins==id*ih*iw&&ous==od*oh*ow,
+			fprintf(stderr,"\
+In FC::forward(...)\n\
+  ins = %d\n\
+  ous = %d\n\
+But\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ins,ous,id,ih,iw,od,oh,ow));
+		bs=std::max(bs,1);
+		memset(out, 0, sizeof(float) * bs * ous);
+		for(int tb=0;tb<bs;tb++)
 		{
 			int adi=tb*ins,ado=tb*ous;
 			for (int i = 0; i < ins; i++) for (int j = 0; j < ous; j++) out[ado+j] += in[adi+i] * w[i * ous + j];
 		}
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&ins==id*ih*iw&&ous==od*oh*ow);
+		ext_assert(ins==id*ih*iw&&ous==od*oh*ow,
+			fprintf(stderr,"\
+In FC::backward(...)\n\
+  ins = %d\n\
+  ous = %d\n\
+But\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",ins,ous,id,ih,iw,od,oh,ow));
 		memset(din, 0, sizeof(float) * bs * ins);
 		for(int tb=0;tb<bs;tb++)
 		{

@@ -6,7 +6,7 @@
 class ADAM
 {
 public:
-	int bs,m; // Batch_Size, Count of weights
+	int m; // Batch_Size, Count of weights
 	float lrt,b1,b2,eps;
 	
 private:
@@ -20,9 +20,8 @@ private:
 	}
 
 public:
-	inline void init(int Batch_Size,float Learn_Rate,float beta1=0.9,float beta2=0.999,float Eps=1e-8)
+	inline void init(float Learn_Rate,float beta1=0.9,float beta2=0.999,float Eps=1e-8)
 	{
-		bs=Batch_Size;
 		lrt=Learn_Rate;
 		b1=beta1,b2=beta2,eps=Eps;
 		m=0;
@@ -41,9 +40,8 @@ public:
 		writf(ouf,wei,m);
 		writf(ouf,v,m),writf(ouf,s,m);
 	}
-	inline void load(std::ifstream& inf,int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
-		bs=Batch_Size;
 		readf(inf,m),readf(inf,lrt);
 		initmem();
 		readf(inf,b1),readf(inf,b2),readf(inf,eps);

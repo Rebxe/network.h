@@ -7,7 +7,7 @@
 class BN
 {
 public:
-	int bs,d,h,w;
+	int d,h,w;
 	float delta, eps; // avg_x=avg_x*delta+pre_x*(1-delta)
 	float *k,*b;
 	float *e_avg,*e_var; // Expect_avg, Expect_variance
@@ -26,9 +26,8 @@ private:
 	}
 
 public:
-	inline void init(int &m, int Batch_Size,SHAPE3D Input,float Delta = 0.9, float EPS = 1e-4)
+	inline void init(int &m,SHAPE3D Input,float Delta = 0.9, float EPS = 1e-4)
 	{
-		bs=Batch_Size;
 		d=std::get<0>(Input),h=std::get<1>(Input),w=std::get<2>(Input);
 		delta=Delta,eps=EPS;
 		m+=d,m+=d;
@@ -44,30 +43,35 @@ public:
 		writf(ouf,delta),writf(ouf,eps);
 		writf(ouf,e_avg,d),writf(ouf,e_var,d);
 	}
-	inline void load(std::ifstream& inf, int Batch_Size, float *&wei, float *&tmp)
+	inline void load(std::ifstream& inf, float *&wei, float *&tmp)
 	{
 		SHAPE3D Input;
 		float Delta,EPS;
 		readf(inf,Input);
 		readf(inf,Delta),readf(inf,EPS);
 		int nou=0;
-		init(nou,Batch_Size,Input,Delta,EPS);
+		init(nou,Input,Delta,EPS);
 		initmem(wei,tmp);
 		readf(inf,e_avg,d),readf(inf,e_var,d);
 	}
 	inline void delthis() { delete[] t_avg,delete[] t_var,delete[] e_avg,delete[] e_var; }
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In BN::forward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
 		for(int i=0;i<d;i++)
 		{
 			int siz=d*h*w,ad=i*h*w;
-			if(Batch_Size!=0)
+			if(bs!=0)
 			{
 				float &avg=t_avg[i],&var=t_var[i];
 				avg=var=0;
@@ -89,11 +93,17 @@ private:
 			}
 		}
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In BN::backward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
 		for(int i=0;i<d;i++)
 		{
 			int siz=d*h*w,ad=i*h*w;

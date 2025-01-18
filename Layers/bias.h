@@ -7,7 +7,7 @@
 class BIAS
 {
 public:
-	int bs,d,h,w;
+	int d,h,w;
 	float *b;
 
 private:
@@ -19,9 +19,8 @@ private:
 	}
 
 public:
-	inline void init(int &m,int Batch_Size,SHAPE3D Input)
+	inline void init(int &m,SHAPE3D Input)
 	{
-		bs=Batch_Size;
 		d=std::get<0>(Input),h=std::get<1>(Input),w=std::get<2>(Input);
 		m+=d;
 	}
@@ -32,23 +31,29 @@ public:
 		memset(b,0,sizeof(float)*d);
 	}
 	inline void save(std::ofstream& ouf){writf(ouf,(SHAPE3D){d,h,w});}
-	inline void load(std::ifstream& inf, int Batch_Size, float *&wei, float *&tmp)
+	inline void load(std::ifstream& inf,float *&wei,float *&tmp)
 	{
 		SHAPE3D Input;
 		readf(inf,Input);
 		int nou=0;
-		init(nou,Batch_Size,Input);
-		initmem(wei, tmp);
+		init(nou,Input);
+		initmem(wei,tmp);
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
-		for(int t=0;t<std::max(Batch_Size,1);t++)
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In BIAS::forward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
+		bs=std::max(bs,1);
+		for(int t=0;t<bs;t++)
 		{
 			int adt=t*d*h*w;
 			for(int i=0;i<d;i++)
@@ -58,11 +63,17 @@ private:
 			}
 		}
 	}
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow);
+		ext_assert(d==id&&h==ih&&w==iw&&d==od&&h==oh&&w==ow,
+			fprintf(stderr,"\
+In BIAS::backward(...)\n\
+  shape = [%d * %d * %d]\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",d,h,w,id,ih,iw,od,oh,ow));
 		for(int t=0;t<bs;t++)
 		{
 			int adt=t*d*h*w;

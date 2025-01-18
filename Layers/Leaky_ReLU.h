@@ -7,40 +7,47 @@
 class LEAKY_RELU
 {
 public:
-	int bs,siz;
+	int siz;
 	float a;
 
 public:
-	inline void init(int Batch_Size,int Siz,float Alpha = 0.01)
-	{
-		bs=Batch_Size;
-		siz=Siz;
-		a=Alpha;
-	}
+	inline void init(int Siz,float Alpha = 0.01){siz=Siz,a=Alpha;}
 	inline void save(std::ofstream& ouf){writf(ouf,siz),writf(ouf,a);}
-	inline void load(std::ifstream& inf, int Batch_Size)
+	inline void load(std::ifstream& inf)
 	{
 		int Siz;
 		float Alpha;
 		readf(inf,Siz),readf(inf,Alpha);
-		init(Batch_Size,Siz,Alpha);
+		init(Siz,Alpha);
 	}
 
 private:
-	inline void forward(int Batch_Size,
+	inline void forward(int bs,
 						int id,int ih,int iw,float *in,
 						int od,int oh,int ow,float *out)
 	{
-		if(Batch_Size!=0) assert(Batch_Size==bs);
-		assert(siz==id*ih*iw&&siz==od*oh*ow);
-		for(int i=0;i<std::max(Batch_Size,1)*siz;i++) out[i]=in[i]<0?a*in[i]:in[i];
+		ext_assert(siz==id*ih*iw&&siz==od*oh*ow,
+			fprintf(stderr,"\
+In LEAKY_RELU::forward(...)\n\
+  siz = %d\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",siz,id,ih,iw,od,oh,ow));
+  		bs=std::max(bs,1);
+		for(int i=0;i<bs*siz;i++) out[i]=in[i]<0?a*in[i]:in[i];
 	}
 	
-	inline void backward(int Batch_Size,
+	inline void backward(int bs,
 						 int id,int ih,int iw,float *in, float* din,
 						 int od,int oh,int ow,float *dout)
 	{
-		assert(Batch_Size==bs&&siz==id*ih*iw&&siz==od*oh*ow);
+		ext_assert(siz==id*ih*iw&&siz==od*oh*ow,
+			fprintf(stderr,"\
+In LEAKY_RELU::backward(...)\n\
+  siz = %d\n\
+but\n\
+  Real Input  = [%d * %d * %d]\n\
+  Real Output = [%d * %d * %d]\n\n",siz,id,ih,iw,od,oh,ow));
 		for(int i=0;i<bs*siz;i++) din[i]=in[i]<0?a*dout[i]:dout[i];
 	}
 
