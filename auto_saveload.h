@@ -121,96 +121,111 @@ namespace auto_sl
 
 #define AUTO_SL_LAYER_CONSTRUCTER_WEIGHT_DELTHISFUNC(name) inline name()\
 {\
-	auto savef=std::bind(\
-		std::remove_reference<decltype(*this)>::type::save,\
+	auto savef = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::save,\
 		this,\
 		std::placeholders::_1);\
-	auto tmp=std::bind(\
-		std::remove_reference<decltype(*this)>::type::load,\
+	auto tmp = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3);\
-	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i,_1,_2);};\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);\
+	auto loadf = std::bind(\
+		tmp,\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3\
+		);\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
-	auto delf=std::bind(\
-		std::remove_reference<decltype(*this)>::type::delthis,\
+	auto delf = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::delthis,\
 		this\
-	);\
+		);\
 	auto_sl::stk.back().first.second->push_back(delf);\
 }
 
 #define AUTO_SL_LAYER_CONSTRUCTER_WEIGHT(name) inline name()\
 {\
-	auto savef=std::bind(\
-		std::remove_reference<decltype(*this)>::type::save,\
+	auto savef = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::save,\
 		this,\
 		std::placeholders::_1);\
-	auto tmp=std::bind(\
-		std::remove_reference<decltype(*this)>::type::load,\
+	auto tmp = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::load,\
 		this,\
-		std::placeholders::_1,std::placeholders::_2,std::placeholders::_3);\
-	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i,_1,_2);};\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);\
+	auto loadf = std::bind(\
+		tmp,\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3\
+		);\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 }
 
 #define AUTO_SL_LAYER_CONSTRUCTER_DELTHISFUNC(name) inline name()\
 {\
-	auto savef=std::bind(\
-		std::remove_reference<decltype(*this)>::type::save,\
+	auto savef = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::save,\
 		this,\
 		std::placeholders::_1);\
-	auto tmp=std::bind(\
-		std::remove_reference<decltype(*this)>::type::load,\
+	auto tmp = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::load,\
 		this,\
 		std::placeholders::_1);\
-	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
+	auto loadf = std::bind(\
+		tmp,\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3\
+		);\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
-	auto delf=std::bind(\
-		std::remove_reference<decltype(*this)>::type::delthis,\
+	auto delf = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::delthis,\
 		this\
-	);\
+		);\
 	auto_sl::stk.back().first.second->push_back(delf);\
 }
 
 #define AUTO_SL_LAYER_CONSTRUCTER(name) inline name()\
 {\
-	auto savef=std::bind(\
-		std::remove_reference<decltype(*this)>::type::save,\
+	auto savef = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::save,\
 		this,\
 		std::placeholders::_1);\
-	auto tmp=std::bind(\
-		std::remove_reference<decltype(*this)>::type::load,\
+	auto tmp = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::load,\
 		this,\
 		std::placeholders::_1);\
-	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
+	auto loadf = std::bind(\
+		tmp,\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3\
+		);\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
 }
 
 #define AUTO_SL_OPTIMIZER_CONSTRUCTER(name) inline name()\
 {\
-	auto savef=std::bind(\
-		std::remove_reference<decltype(*this)>::type::save,\
+	auto savef = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::save,\
 		this,\
 		std::placeholders::_1);\
-	auto tmp=std::bind(\
-		std::remove_reference<decltype(*this)>::type::load,\
+	auto tmp = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::load,\
 		this,\
 		std::placeholders::_1);\
-	auto loadf=[&,tmp](std::ifstream &i,float *&_1,float *&_2){tmp(i);};\
-	auto delf=std::bind(\
-		std::remove_reference<decltype(*this)>::type::delthis,\
-		this\
-	);\
+	auto loadf = std::bind(\
+		tmp,\
+		std::placeholders::_1, std::placeholders::_2, std::placeholders::_3\
+		);\
 	auto_sl::stk.back().first.first.first->push_back(savef);\
 	auto_sl::stk.back().first.first.second->push_back(loadf);\
+	auto delf = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::delthis,\
+		this\
+		);\
 	auto_sl::stk.back().first.second->push_back(delf);\
-	(*auto_sl::stk.back().second.first)=std::bind(\
-		std::remove_reference<decltype(*this)>::type::_wei,\
+	(*auto_sl::stk.back().second.first) = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::_wei,\
 		this);\
-	(*auto_sl::stk.back().second.second)=std::bind(\
-		std::remove_reference<decltype(*this)>::type::_tmp,\
+	(*auto_sl::stk.back().second.second) = std::bind(\
+		&std::remove_reference<decltype(*this)>::type::_tmp,\
 		this);\
 }

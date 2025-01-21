@@ -681,7 +681,9 @@ inline void col2img( // simply add
 	        for(int i=0;i<4;i++) delete[] packb[i];
 	    }
 	#else
-  		#warning use '-mavx2 -mfma' to enable AVX256
+		#ifndef DISABLE_AVX
+			#error use '-mavx2 -mfma' to enable AVX256, define DISABLE_AVX to ignore
+		#endif
 	    void Matrix_Mul(int N, int M, int K, float* A, float* B, float* Res)
 	    {
 	        float *packb[4];

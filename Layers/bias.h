@@ -30,7 +30,7 @@ public:
 		// init w
 		memset(b,0,sizeof(float)*d);
 	}
-	inline void save(std::ofstream& ouf){writf(ouf,(SHAPE3D){d,h,w});}
+	inline void save(std::ofstream& ouf){writf(ouf,SHAPE3D(d,h,w));}
 	inline void load(std::ifstream& inf,float *&wei,float *&tmp)
 	{
 		SHAPE3D Input;
@@ -93,13 +93,13 @@ public:
 		x.dat->oud++;
 		#define pch(x) std::placeholders::_##x
 		res.dat->forward_f=std::bind(
-			std::remove_reference<decltype(*this)>::type::forward,
+			&std::remove_reference<decltype(*this)>::type::forward,
 			this,
 			pch(1),
 			pch(2),pch(3),pch(4),pch(5),
 			pch(6),pch(7),pch(8),pch(9));
 		res.dat->backward_f=std::bind(
-			std::remove_reference<decltype(*this)>::type::backward,
+			&std::remove_reference<decltype(*this)>::type::backward,
 			this,
 			pch(1),
 			pch(2),pch(3),pch(4),pch(5),pch(6),
