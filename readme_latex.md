@@ -1,7 +1,5 @@
-[Github 仓库](https://github.com/Rebxe/network.h)
-
 - 2025.01.18 更新：去除了预设层级和优化器的成员变量 `int bs`，用户不再需要为每个层级和优化器都指定批大小，仅需在 `auto_dao::init()` 中指定即可；
-- 2025.01.21 更新：修复了 `Visual Studio` 不能编译的问题；
+- 2025.01.30 更新：计算加速改用 Eigen + ViennaCL，改善了 GPU 上计算的性能；
 
 ### 简介
 
@@ -9,16 +7,37 @@
 
 计算加速：
 
-- CPU 加速：基于 OpenMP 和 AVX256 指令集；
-- GPU 加速：基于微软 `amp.h`；（效果不太好）
+- CPU 加速：基于 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page)（内附 3.4.0 版本，无需设置额外引用目录）；
+- GPU 加速：基于 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) 和使用 OpenCL 的 [ViennaCL](https://viennacl.sourceforge.net/)（需要搭建 OpenCL 环境并设置额外引用目录） ；
 
-CPU 代码支持大部分编译器，可用基于 GCC 的 DEV-C++ 编译；GPU 代码仅支持 VS 系列编译器编译。
+CPU 代码支持大部分编译器，可用基于 GCC 的 DEV-C++ 编译。
+
+对于 GPU 代码：
+
+- Windows 下仅支持 VS 系列编译器编译（存疑，作者并未在其它环境下成功）；
+- Linux 下情况不明，作者没有尝试；
 
 支持自动求偏导（反向传播），用户仅需定义前向过程。
 
 支持读取/保存图片文件，使用了开源库 [stb](https://github.com/nothings/stb)。
 
 本文仅介绍库的使用方法，关于机器学习的原理部分请移步：[咕咕咕]()
+
+
+
+### 注意事项
+
+#### 关于各种常量及开关
+
+- 定义 `ENABLE_GPU` 以启用 GPU 计算（ViennaCL on OpenCL）；
+- 定义 `ENABLE_AUTO_SL` 以启用自动生成保存/读取/释放内存函数相关功能；
+- 使用宏 `MAX_BUFSIZE_BYTE` 以控制计算过程中额外使用的内存（显存）大小（防止爆内存/显存），默认值为 `1073741824`，即 $1\text{GB}$；（该功能尚未完善，额外内存可能超过该值，故建议尽量设置小一点）
+
+
+
+#### 关于计算加速
+
+由于矩阵乘法算子基于 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) 和使用 OpenCL 的 [ViennaCL](https://viennacl.sourceforge.net/)，故仅需加速此两库即可。具体可以通过启用 OpenMP 和各种指令集（AVX、SSE）来加速，例如在 GCC 下使用 `-fopenmp -mavx2 -mfma` 编译命令来启用 OpenMP 和 AVX256 指令集。
 
 
 
@@ -555,7 +574,7 @@ f(x)=\frac{e^x-e^{-x}}{e^x+e^{-x}}
 $$
 
 
-### 自动保存/读取/释放空间
+### 自动生成保存/读取/释放空间函数
 
 头文件：`auto_saveload.h`，定义宏 `ENABLE_AUTO_SL` 以启用。
 
@@ -633,6 +652,7 @@ AUTO_SL_OPTIMIZER_CONSTRUCTER(classname)
 |    头文件     |                          含义/作用                           |
 | :-----------: | :----------------------------------------------------------: |
 |   `stb/*.h`   | 开源库 [stb](https://github.com/nothings/stb) 中的若干头文件 |
+|   `Eigen/*`   | 开源库 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) 的 3.4.0 版本 |
 | `fast_calc.h` |                    定义了快速矩阵乘法函数                    |
 |  `defines.h`  |                   各头文件的公共定义、引用                   |
 |  `network.h`  |                            库入口                            |
@@ -646,11 +666,8 @@ AUTO_SL_OPTIMIZER_CONSTRUCTER(classname)
 #include <cstdlib>
 #include <cstdio>
 #include <chrono>
-#include <string>
 
-#define ENABLE_OPENMP
-#define THREAD_NUM 6
-#define ENABLE_AUTO_SL
+#define ENABLE_AUTO_SL 
 
 #include "./network_h/network.h"
 
@@ -665,74 +682,74 @@ struct NETWORK
 {
 	AUTO_SL_BEG
 		ADAM opt;
-
-        CONV c1;
-        BN b1;
-        LEAKY_RELU a1;
-        POOLING p1;
-
-        CONV c2;
-        BN b2;
-        LEAKY_RELU a2;
-        POOLING p2;
-
-        FC fc1;
-        BIAS bi1;
-        LEAKY_RELU a3;
-
-        FC fc2;
-        BIAS bi2;
-        SOFTMAX sfm1;
+		
+		CONV c1;
+		BN b1;
+		LEAKY_RELU a1;
+		POOLING p1;
+		
+		CONV c2;
+		BN b2;
+		LEAKY_RELU a2;
+		POOLING p2;
+		
+		FC fc1;
+		BIAS bi1;
+		LEAKY_RELU a3;
+		
+		FC fc2;
+		BIAS bi2;
+		SOFTMAX sfm1;
 	AUTO_SL_END
-
+	
 	float in[Batch_Size * 28 * 28];
 	val3d out;
-
+	
 	inline void init()
 	{
 		opt.init(lrt);
-
-		c1.init(opt.m, SHAPE3D(1, 28, 28), 8, { 3, 3 }, { 1, 1 }, { 1, 1 }, 0);
-		b1.init(opt.m, SHAPE3D(8, 28, 28));
-		a1.init(8 * 28 * 28);
-		p1.init(SHAPE3D(8, 28, 28), { 2, 2 });
-
-		c2.init(opt.m, SHAPE3D(8, 14, 14), 16, { 3, 3 }, { 1, 1 }, { 1, 1 }, 0);
-		b2.init(opt.m, SHAPE3D(16, 14, 14));
-		a2.init(16 * 14 * 14);
-		p2.init(SHAPE3D(16, 14, 14), { 2, 2 });
-
-		fc1.init(opt.m, 16 * 7 * 7, 128);
-		bi1.init(opt.m, SHAPE3D(128, 1, 1));
+		
+		c1.init(opt.m,SHAPE3D(1,28,28),8,{3,3},{1,1},{1,1},0);
+		b1.init(opt.m,SHAPE3D(8,28,28));
+		a1.init(8*28*28);
+		p1.init(SHAPE3D(8,28,28),{2,2});
+		
+		c2.init(opt.m,SHAPE3D(8,14,14),16,{3,3},{1,1},{1,1},0);
+		b2.init(opt.m,SHAPE3D(16,14,14));
+		a2.init(16*14*14);
+		p2.init(SHAPE3D(16,14,14),{2,2});
+		
+		fc1.init(opt.m,16*7*7,128);
+		bi1.init(opt.m,SHAPE3D(128,1,1));
 		a3.init(128);
-
-		fc2.init(opt.m, 128, 10);
-		bi2.init(opt.m, SHAPE3D(10, 1, 1));
-		sfm1.init(SHAPE3D(10, 1, 1));
-
+		
+		fc2.init(opt.m,128,10);
+		bi2.init(opt.m,SHAPE3D(10,1,1));
+		sfm1.init(SHAPE3D(10,1,1));
+		
 		opt.build();
-
-		float *wei = opt._wei(), *tmp = opt._tmp();
-		c1.build(wei, tmp), b1.build(wei, tmp);
-		c2.build(wei, tmp), b2.build(wei, tmp);
-		fc1.build(wei, tmp), bi1.build(wei, tmp);
-		fc2.build(wei, tmp, INIT_XAVIER), bi2.build(wei, tmp);
+		
+		float *wei=opt._wei(),*tmp=opt._tmp();
+		c1.build(wei,tmp),b1.build(wei,tmp);	
+		c2.build(wei,tmp),b2.build(wei,tmp);
+		fc1.build(wei,tmp),bi1.build(wei,tmp);
+		fc2.build(wei,tmp,INIT_XAVIER),bi2.build(wei,tmp); 
 	}
 	inline void forward(bool test)
 	{
-		auto_dao::init(test ? 0 : Batch_Size);
-		val3d x(1, 28, 28, in);
-		x = c1(x), x = b1(x), x = a1(x), x = p1(x);
-		x = c2(x), x = b2(x), x = a2(x), x = p2(x);
-		x = fc1(x), x = bi1(x), x = a3(x);
-		x = fc2(x), x = bi2(x), x = sfm1(x);
-		out = x;
+		auto_dao::init(test?0:Batch_Size);
+		val3d x(1,28,28,in);
+		x=c1(x),x=b1(x),x=a1(x),x=p1(x);
+		x=c2(x),x=b2(x),x=a2(x),x=p2(x);
+		x=fc1(x),x=bi1(x),x=a3(x);
+		x=fc2(x),x=bi2(x),x=sfm1(x);
+		out=x;
 	}
 	inline float backward(float *rout)
 	{
 		opt.init_backward();
 		auto_dao::init_backward();
-		float res = MSEloss(out, rout);
+		float res=MSEloss(out,rout);
 		out.backward();
 		opt.flush();
 		return res;
@@ -747,7 +764,7 @@ float total_loss;
 
 NETWORK brn;
 
-inline void loaddata(string imgpath, string anspath, int T)
+inline void loaddata(string imgpath,string anspath,int T)
 {
 	FILE* fimg = fopen(imgpath.c_str(), "rb");
 	FILE* fans = fopen(anspath.c_str(), "rb");
@@ -788,7 +805,7 @@ void train()
 		for (int i = 0; i < 10; i++) outs[couts++] = casans[cas] == i;
 	}
 	brn.forward(false);
-	total_loss += brn.backward(outs);
+	total_loss+=brn.backward(outs);
 }
 
 inline bool test(int cas)
@@ -808,10 +825,10 @@ int main()
 	int mode;
 	scanf("%d", &mode);
 	system("cls");
-	string imgpath = "./MNIST/img",
-		anspath = "./MNIST/ans",
-		testimgpath = "./MNIST/testimg",
-		testanspath = "./MNIST/testans";
+	string imgpath = "./MNIST/img", 
+		   anspath = "./MNIST/ans", 
+		   testimgpath = "./MNIST/testimg",
+		   testanspath = "./MNIST/testans";
 	printf("训练图片文件：%s\n", imgpath.c_str());
 	printf("训练答案文件：%s\n", anspath.c_str());
 	printf("评估图片文件：%s\n", testimgpath.c_str());
@@ -826,12 +843,12 @@ int main()
 	else
 	{
 		printf("加载数据中...\n");
-		loaddata(imgpath, anspath, T);
+		loaddata(imgpath,anspath,T);
 		printf("加载数据完成\n\n");
 		brn.init();
 		total_loss = 0;
 		printf("开始训练...\n\n");
-		auto start = std::chrono::high_resolution_clock::now();
+    	auto start = std::chrono::high_resolution_clock::now();
 		for (int i = 1; i <= total_batch; i++)
 		{
 			train();
@@ -842,17 +859,17 @@ int main()
 				total_loss = 0;
 			}
 		}
-		auto stop = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+	    auto stop = std::chrono::high_resolution_clock::now();
+	    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 		brn.save("best.ai");
-		printf("\n训练完成！共训练 %d ms，模型已保存到 best.ai\n\n", (int)duration);
+		printf("\n训练完成！共训练 %d ms，模型已保存到 best.ai\n\n",(int)duration);
 	}
 	printf("加载测试数据中...\n");
-	loaddata(testimgpath, testanspath, TEST_T);
+	loaddata(testimgpath,testanspath,TEST_T);
 	printf("加载测试数据完成\n\n");
 	printf("开始模型评估...\n");
 	int tot = 0;
-	for (int i = 1; i <= TEST_T; i++) tot += test(i);
+	for (int i = 1; i <= TEST_T; i ++) tot += test(i);
 	printf("模型评估完成，正确率：%.2f%%\n\n", (float)tot / TEST_T * 100);
 	brn.delthis();
 	system("pause");
