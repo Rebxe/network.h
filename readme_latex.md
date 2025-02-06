@@ -1,5 +1,8 @@
+[项目地址](https://github.com/Rebxe/network.h)
+
 - 2025.01.18 更新：去除了预设层级和优化器的成员变量 `int bs`，用户不再需要为每个层级和优化器都指定批大小，仅需在 `auto_dao::init()` 中指定即可；
 - 2025.01.30 更新：计算加速改用 Eigen + ViennaCL，改善了 GPU 上计算的性能；
+- 2025.02.06 更新：更正了 g++ 下的优化命令；
 
 ### 简介
 
@@ -37,7 +40,7 @@ CPU 代码支持大部分编译器，可用基于 GCC 的 DEV-C++ 编译。
 
 #### 关于计算加速
 
-由于矩阵乘法算子基于 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) 和使用 OpenCL 的 [ViennaCL](https://viennacl.sourceforge.net/)，故仅需加速此两库即可。具体可以通过启用 OpenMP 和各种指令集（AVX、SSE）来加速，例如在 GCC 下使用 `-fopenmp -mavx2 -mfma` 编译命令来启用 OpenMP 和 AVX256 指令集。
+由于矩阵乘法算子基于 [Eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) 和使用 OpenCL 的 [ViennaCL](https://viennacl.sourceforge.net/)，故仅需加速此两库即可。具体可以通过启用 OpenMP 和各种指令集（AVX、SSE）来加速，例如在 GCC 下使用 `-Ofast -fopenmp -march=native` 编译命令来启用 OpenMP 和指令集并开启 Ofast 优化。
 
 
 
