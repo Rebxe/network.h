@@ -3,10 +3,11 @@
 - 2025.01.18 更新：去除了预设层级和优化器的成员变量 `int bs`，用户不再需要为每个层级和优化器都指定批大小，仅需在 `auto_dao::init()` 中指定即可；
 - 2025.01.30 更新：计算加速改用 Eigen + ViennaCL，改善了 GPU 上计算的性能；
 - 2025.02.06 更新：更正了 g++ 下的优化命令；
+- 2025.02.13 更新：增加了原地计算功能，修复自动保存/读取的 bug，优化 `FC` 层计算速度，优化了各层级申请内存所需的时间；
 
 ### 简介
 
-基于 C++14 的仅头文件的神经网络库，代码可读，方便研究神经网络的实现。
+基于 C++14 的仅头文件的神经网络库，代码可读且速度较快，方便研究神经网络的实现。
 
 计算加速：
 
@@ -95,23 +96,31 @@ CPU 代码支持大部分编译器，可用基于 GCC 的 DEV-C++ 编译。
 |               `backward()`                |            将该张量的偏导传递下去[*](#backward())            |
 |           `auto_dao::node *dat`           | 内部变量，不使用 `private` 关键字仅仅是为了增加代码可读性，避免大量 `friend` 关键字 |
 
-<span id="backward()">*</span>：调用 `backward` 时，会将该张量标记为”偏导计算完成“状态，并将该张量的偏导反向传播至对其有影响的张量处。若本次操作导致某个张量的偏导计算完成（影响到的所有张量的偏导都已传播至该张量），则会自动调用其 `backward` 函数（类似 DAG 上反向 bfs）。故**用户仅需在手动计算所有输出端张量的偏导后，手动调用所有输出端张量的 `backward` 函数**。
+<span id="backward()">*</span>：调用 `backward` 时，会将该张量标记为“偏导计算完成”状态，并将该张量的偏导反向传播至对其有影响的张量处。若本次操作导致某个张量的偏导计算完成（影响到的所有张量的偏导都已传播至该张量），则会自动调用其 `backward` 函数（类似 DAG 上反向 bfs）。故**用户仅需在手动计算所有输出端张量的偏导后，手动调用所有输出端张量的 `backward` 函数**。
+
+
+
+#### 关于原地计算（`inplace` 选项）
+
+为了节省空间，某些操作具有 `inplace` 选项，`inplace=true` 的操作将在原地完成。此时该操作会复用原本张量的空间，使得原本的张量失效。
+
+所以经过 `inplace=true` 的操作后原始张量将失效，请勿再使用它。
 
 
 
 #### 张量相关函数
 
-|                    函数                    |                          含义/作用                           |
-| :----------------------------------------: | :----------------------------------------------------------: |
-| `val3d reshape(val3d x,int d,int h,int w)` | 软塑性：创建一个新的三维张量，`d,h,w` 为传入的 `d,h,w`，数据从 `x.a` 拷贝（需保证 `d*h*w==x.d*x.h*x.w`） |
-| `val3d toshape(val3d x,int d,int h,int w)` | 硬塑性：创建一个新的三维张量，`d,h,w` 为传入的 `d,h,w`，数据从 `x.a` 循环拷贝，即 `i,j,k` 处的数值为 `x` 的 `i%x.d,j%x.h,k%x.w` 处的数值 |
-|     `val3d operator+(val3d x,val3d y)`     | 创建一个新的三维张量，其每一位的数值都是 `x` 对应位置的数值和 `y` 对应位置的数值相加（需保证 `x` 和 `y` 形状相同） |
-|     `val3d operator-(val3d x,val3d y)`     |                      同上，相加变为相减                      |
-|     `val3d operator*(val3d x,val3d y)`     |                          同上，相乘                          |
-|     `val3d operator/(val3d x,val3d y)`     |                  同上，相除（`x` 为被除数）                  |
-|       `val3d dcat(val3d x,val3d y)`        | 创建一个新的三维张量，其是 `x` 和 `y` 按照 `d` 这一维拼接起来的结果（`x` 占用 `[0,x.d-1]`，`y` 占用 `[x.d,x.d+y.d-1]`，需保证 `x.h==y.h` 且 `x.w==y.w`） |
-|  `float MSEloss(val3d x,float* realout)`   | 使用 `realout[0]` 到 `realout[max(auto_dao::Batch_Size,1)*x.d*x.h*x.w]` 中的数据为三维张量 `x` 计算[均方差损失](#MSEloss)，同时为 `x` 计算偏导 |
-|  `float BCEloss(val3d x,float* realout)`   |          同上，但计算的是[二元交叉熵损失](#BCEloss)          |
+|                             函数                             |                          含义/作用                           |
+| :----------------------------------------------------------: | :----------------------------------------------------------: |
+| `val3d reshape(val3d x,int d,int h,int w,bool inplace=false)` | 软塑形：创建一个新的三维张量，`d,h,w` 为传入的 `d,h,w`，数据从 `x.a` 拷贝（需保证 `d*h*w==x.d*x.h*x.w`） |
+|          `val3d toshape(val3d x,int d,int h,int w)`          | 硬塑形：创建一个新的三维张量，`d,h,w` 为传入的 `d,h,w`，数据从 `x.a` 循环拷贝，即 `i,j,k` 处的数值为 `x` 的 `i%x.d,j%x.h,k%x.w` 处的数值 |
+|              `val3d operator+(val3d x,val3d y)`              | 创建一个新的三维张量，其每一位的数值都是 `x` 对应位置的数值和 `y` 对应位置的数值相加（需保证 `x` 和 `y` 形状相同） |
+|              `val3d operator-(val3d x,val3d y)`              |                      同上，相加变为相减                      |
+|              `val3d operator*(val3d x,val3d y)`              |                          同上，相乘                          |
+|              `val3d operator/(val3d x,val3d y)`              |                  同上，相除（`x` 为被除数）                  |
+|                `val3d dcat(val3d x,val3d y)`                 | 创建一个新的三维张量，其是 `x` 和 `y` 按照 `d` 这一维拼接起来的结果（`x` 占用 `[0,x.d-1]`，`y` 占用 `[x.d,x.d+y.d-1]`，需保证 `x.h==y.h` 且 `x.w==y.w`） |
+|           `float MSEloss(val3d x,float* realout)`            | 使用 `realout[0]` 到 `realout[max(auto_dao::Batch_Size,1)*x.d*x.h*x.w]` 中的数据为三维张量 `x` 计算[均方差损失](#MSEloss)，同时为 `x` 计算偏导 |
+|           `float BCEloss(val3d x,float* realout)`            |          同上，但计算的是[二元交叉熵损失](#BCEloss)          |
 
 ##### <span id="MSEloss">均方差损失（MSEloss）</span>
 
@@ -130,50 +139,6 @@ $$
 
 
 
-#### Demo
-
-```cpp
-float arr[2*2*2]={0.1,0.2,
-                  0.3,0.4,
-
-                  0.1,0.2,
-                  0.3,0.4};
-auto_dao::init(1);  // 准备前向过程，批大小 1，当前是训练阶段 
-val3d x(1,2,2,0.5); // 创建一个 1*2*2 的三维张量，每一位的值都是 0.5 
-val3d y(1,2,2,0.6); // 创建一个 1*2*2 的三维张量，每一位的值都是 0.6
-val3d z(2,2,2,arr); // 根据 arr 中的值创建一个 2*2*2 的三维张量
-val3d xy=dcat(x,y); // 按 d 一维拼接 x 和 y 两个张量，结果为 2*2*2 的三维张量 
-val3d res1=xy+z;    // 将 xy 和 z 对应的每一位加起来 
-val3d res2=xy*z;    // 将 xy 和 z 对应的每一位乘起来 
-for(int i=0;i<2*2*2;i++) printf("%.2f ",res1.a[i]);printf("\n");
-for(int i=0;i<2*2*2;i++) printf("%.2f ",res2.a[i]);printf("\n");
-/*
-输出应为：
-0.60 0.70 0.80 0.90 0.70 0.80 0.90 1.00
-0.05 0.10 0.15 0.20 0.06 0.12 0.18 0.24
-这里以第二行第一个数字为例，0.5*0.1 确实是 0.05 
-*/
-auto_dao::init_backward(); // 准备反向传播 
-for(int i=0;i<2*2*2;i++) res1.da[i]=1,res2.da[i]=-1; // 给出输出端张量的偏导
-res1.backward(),res2.backward(); // 将偏导传递下去
-for(int i=0;i<1*2*2;i++) printf("%.2f ",x.da[i]);printf("\n");
-for(int i=0;i<1*2*2;i++) printf("%.2f ",y.da[i]);printf("\n");
-for(int i=0;i<2*2*2;i++) printf("%.2f ",z.da[i]);printf("\n");
-/*
-输出应为：
-0.90 0.80 0.70 0.60
-0.90 0.80 0.70 0.60
-0.50 0.50 0.50 0.50 0.40 0.40 0.40 0.40
-这里以第一行第一个数字为例：
-    - 这是 x 中第一个数对应的偏导，不妨设其为 w；
-    - w 影响到 res1 中的第一个数 r1 和 res2 的第一个数 r2；
-    - 其中 r1 = w + 0.1, r2 = w * 0.1；
-    - r1 的偏导为 1，r2 的偏导为 -1，故 w 的偏导为 1 + (-1) * 0.1 = 0.9，结果正确。 
-*/
-```
-
-
-
 ### 预设优化器
 
 头文件：`Optimizer/*.h`
@@ -186,6 +151,7 @@ for(int i=0;i<2*2*2;i++) printf("%.2f ",z.da[i]);printf("\n");
 
 |               成员                |                          含义/作用                           |
 | :-------------------------------: | :----------------------------------------------------------: |
+|         `	bool built`          |                        是否完成初始化                        |
 |              `int m`              |                           权重数量                           |
 |            `float lrt`            |                            学习率                            |
 | `void init(float Learn_Rate,...)` | 初始化优化器参数，该函数的第一个参数及含义固定，为学习率，根据不同优化器具体情况可能有更多参数 |
@@ -197,7 +163,7 @@ for(int i=0;i<2*2*2;i++) printf("%.2f ",z.da[i]);printf("\n");
 |          `float* _tmp()`          |                     获取偏导数组起始地址                     |
 |      `void init_backward()`       |        清空累计的偏导，即将偏导数组置零，准备反向传播        |
 |          `void flush()`           |       利用当前累计的偏导更新权重，在反向传播完成后调用       |
-|           默认构造函数            | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|           默认构造函数            | 初始化 `built=false`，当启用宏 `ENABLE_AUTO_SL` 时还用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 参数命名规则和主流的神经网络库大致相同。
 
@@ -254,12 +220,13 @@ $$
 
 |                          成员                           |                          含义/作用                           |
 | :-----------------------------------------------------: | :----------------------------------------------------------: |
+|                    `	bool built`                     |                        是否完成初始化                        |
 |                 `void init(int& m,...)`                 | 初始化层级参数，该函数第一个参数及其含义固定，为权重计数器（用于统计权重数量，一般传入优化器的 `m`）。根据不同层级的具体情况可能有更多参数 |
 |        `void build(float*& wei,float*& tmp,...)`        | 为层级分配权重、偏导储存空间并初始化权重，其中 `wei` 为权重储存起始地址，`tmp` 为偏导储存起始地址 |
 |             `void save(std::ofstream& ouf)`             |   将层级参数保存到二进制文件流 `ouf` 中，权重并不会被保存    |
 | `void load(std::ifstream& inf,float*& wei,float*& tmp)` | 从二进制文件流 `inf` 中读取层级参数，并根据 `wei` 和 `tmp` 为层级分配权重[*](#load()) |
 |               `val3d operator()(val3d x)`               |         在三维张量 `x` 上应用该层级的操作并返回结果          |
-|                      默认构造函数                       | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|                      默认构造函数                       | 初始化 `built=false`，在启用宏 `ENABLE_AUTO_SL` 时还用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 <span id="load()">*</span>：`wei` 为权重数组起始地址，`tmp` 为偏导数组起始地址，层级将会从 `wei` 中获取其权重并分配空间（这要求优化器的 `load()` 函数已经被调用）。
 
@@ -267,11 +234,12 @@ $$
 
 |              成员               |                          含义/作用                           |
 | :-----------------------------: | :----------------------------------------------------------: |
+|        `	bool built`         |                        是否完成初始化                        |
 |        `void init(...)`         |     初始化层级参数，根据不同层级的具体情况可能有更多参数     |
 | `void save(std::ofstream& ouf)` |            将层级参数保存到二进制文件流 `ouf` 中             |
 | `void load(std::ifstream& inf)` |             从二进制文件流 `inf` 中读取层级参数              |
 |   `val3d operator()(val3d x)`   |         在三维张量 `x` 上应用该层级的操作并返回结果          |
-|          默认构造函数           | 仅在启用宏 `ENABLE_AUTO_SL` 时才有默认构造函数，用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
+|          默认构造函数           | 初始化 `built=false`，在启用宏 `ENABLE_AUTO_SL` 时还用于自动生成神经网络的保存、读取和空间释放函数（实现静态反射） |
 
 
 
@@ -299,14 +267,15 @@ $$
 
 定义了偏置层类型 `BIAS`，其特殊成员如下：
 
-|                 成员                  |                         含义/作用                         |
-| :-----------------------------------: | :-------------------------------------------------------: |
-|                `int d`                |                     输入张量的通道数                      |
-|                `int h`                |                      输入张量的高度                       |
-|                `int w`                |                      输入张量的宽度                       |
-|              `float* b`               |                     权重存储起始地址                      |
-|   `void init(int& m,SHAPE3D Input)`   | 初始化层级参数，额外利用 `Input` 的三维大小初始化 `d,h,w` |
-| `void build(float*& wei,float*& tmp)` |    为层级分配权重、偏导储存空间，将 `b` 初始化为全 $0$    |
+|                         成员                         |                          含义/作用                           |
+| :--------------------------------------------------: | :----------------------------------------------------------: |
+|                       `int d`                        |                       输入张量的通道数                       |
+|                       `int h`                        |                        输入张量的高度                        |
+|                       `int w`                        |                        输入张量的宽度                        |
+|                      `float* b`                      |                       权重存储起始地址                       |
+|                  `	bool inplace`                  |                         是否原地计算                         |
+| `void init(int& m,SHAPE3D Input,bool Inplace=false)` | 初始化层级参数，额外利用 `Input` 的三维大小初始化 `d,h,w`，并使用 `Inplace` 初始化 `inplace` |
+|        `void build(float*& wei,float*& tmp)`         |     为层级分配权重、偏导储存空间，将 `b` 初始化为全 $0$      |
 
 `BIAS` 层将会接受大小为 `d*h*w` 的三维张量输入，并为第 $i$ 个通道的所有值增加 `b[i]` 的偏置后输出。
 
@@ -524,10 +493,11 @@ $$
 
 公共特殊成员：
 
-|           成员           |                          含义/作用                           |
-| :----------------------: | :----------------------------------------------------------: |
-|        `int siz`         |                  输入张量的大小（`d*h*w`）                   |
-| `void init(int Siz,...)` | 初始化层级参数，第一个参数及其含义固定，使用 `Siz` 初始化 `siz`，若有更多参数将给出说明 |
+|                    成员                     |                          含义/作用                           |
+| :-----------------------------------------: | :----------------------------------------------------------: |
+|                  `int siz`                  |                  输入张量的大小（`d*h*w`）                   |
+|               `bool inplace`                |                         是否原地计算                         |
+| `void init(int Siz,bool Inplace=false,...)` | 初始化层级参数，前两个参数及其含义固定（使用 `Siz` 初始化 `siz`，使用 `Inplace` 初始化 `inplace`），若有更多参数将给出说明 |
 
 各种激活函数层将对输入张量的每个数值分别应用对应的激活函数 $f$，即 $x_{\text{out}}=f(x_{\text{in}})$，输出张量三维形状不变。
 
@@ -614,16 +584,18 @@ AUTO_SL_END
 
 #### 进阶用法
 
-对于用户自己定义的层级/优化器，可以使用如下几个宏自动生成对应的构造函数：
+对于用户自己定义的层级/优化器，可以再其构造函数中使用如下几个宏自动生成对应的反射注册代码：
 
 ```cpp
-AUTO_SL_LAYER_CONSTRUCTER_WEIGHT_DELTHISFUNC(classname)
-AUTO_SL_LAYER_CONSTRUCTER_WEIGHT(classname)
-AUTO_SL_LAYER_CONSTRUCTER_DELTHISFUNC(classname)
-AUTO_SL_LAYER_CONSTRUCTER(classname)
+AUTO_SL_LAYER_CONSTRUCTER_WEIGHT_DELTHISFUNC(weight_add)
+AUTO_SL_LAYER_CONSTRUCTER_WEIGHT(weight_add)
+AUTO_SL_LAYER_CONSTRUCTER_DELTHISFUNC
+AUTO_SL_LAYER_CONSTRUCTER
 
-AUTO_SL_OPTIMIZER_CONSTRUCTER(classname)
+AUTO_SL_OPTIMIZER_CONSTRUCTER
 ```
+
+其中 `weight_add` 为指向该层级的权重起始地址的指针，用于在保存/读取时确定各层级间权重分配顺序。
 
 具体详见 `auto_saveload.h` 中的注释及源代码。
 
@@ -714,26 +686,26 @@ struct NETWORK
 		
 		c1.init(opt.m,SHAPE3D(1,28,28),8,{3,3},{1,1},{1,1},0);
 		b1.init(opt.m,SHAPE3D(8,28,28));
-		a1.init(8*28*28);
+		a1.init(8*28*28,true);
 		p1.init(SHAPE3D(8,28,28),{2,2});
 		
 		c2.init(opt.m,SHAPE3D(8,14,14),16,{3,3},{1,1},{1,1},0);
 		b2.init(opt.m,SHAPE3D(16,14,14));
-		a2.init(16*14*14);
+		a2.init(16*14*14,true);
 		p2.init(SHAPE3D(16,14,14),{2,2});
 		
 		fc1.init(opt.m,16*7*7,128);
-		bi1.init(opt.m,SHAPE3D(128,1,1));
-		a3.init(128);
+		bi1.init(opt.m,SHAPE3D(128,1,1),true);
+		a3.init(128,true);
 		
 		fc2.init(opt.m,128,10);
-		bi2.init(opt.m,SHAPE3D(10,1,1));
+		bi2.init(opt.m,SHAPE3D(10,1,1),true);
 		sfm1.init(SHAPE3D(10,1,1));
 		
 		opt.build();
 		
 		float *wei=opt._wei(),*tmp=opt._tmp();
-		c1.build(wei,tmp),b1.build(wei,tmp);	
+		c1.build(wei,tmp),b1.build(wei,tmp);
 		c2.build(wei,tmp),b2.build(wei,tmp);
 		fc1.build(wei,tmp),bi1.build(wei,tmp);
 		fc2.build(wei,tmp,INIT_XAVIER),bi2.build(wei,tmp); 
@@ -751,7 +723,6 @@ struct NETWORK
 	inline float backward(float *rout)
 	{
 		opt.init_backward();
-		auto_dao::init_backward();
 		float res=MSEloss(out,rout);
 		out.backward();
 		opt.flush();
