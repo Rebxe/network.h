@@ -3,7 +3,8 @@
 - 2025.01.18 更新：去除了预设层级和优化器的成员变量 `int bs`，用户不再需要为每个层级和优化器都指定批大小，仅需在 `auto_dao::init()` 中指定即可；
 - 2025.01.30 更新：计算加速改用 Eigen + ViennaCL，改善了 GPU 上计算的性能；
 - 2025.02.06 更新：更正了 g++ 下的优化命令；
-- 2025.02.13 更新：增加了原地计算功能，修复自动保存/读取的 bug，优化 `FC` 层计算速度，优化了各层级申请内存所需的时间；
+- 2025.02.13 更新：增加了原地计算功能，修复自动保存/读取的 bug，优化 `FC` 层计算速度，优化了各层级申请内存所需的时间，优化运行所需的内存大小；
+- 2025.02.24 更新：修复 SoftMax 层中下标计算错误，重载实现 `operator[N][C][H][W]`；
 
 ### 简介
 
@@ -364,7 +365,7 @@ void init(int& m,
 <span id="POOLING::init()">*</span>：`init()` 函数将初始化池化层参数并计算出 `ouh` 和 `ouw`，详细声明及特殊参数含义如下：
 
 ```cpp
-inline void init(SHAPE3D Input,
+void init(SHAPE3D Input,
     std::pair<int,int> Core,
     int Type=MAX_POOLING,
     std::pair<int,int> Stride={-1,-1})
@@ -680,7 +681,7 @@ struct NETWORK
 	float in[Batch_Size * 28 * 28];
 	val3d out;
 	
-	inline void init()
+	void init()
 	{
 		opt.init(lrt);
 		
@@ -710,7 +711,7 @@ struct NETWORK
 		fc1.build(wei,tmp),bi1.build(wei,tmp);
 		fc2.build(wei,tmp,INIT_XAVIER),bi2.build(wei,tmp); 
 	}
-	inline void forward(bool test)
+	void forward(bool test)
 	{
 		auto_dao::init(test?0:Batch_Size);
 		val3d x(1,28,28,in);
@@ -720,7 +721,7 @@ struct NETWORK
 		x=fc2(x),x=bi2(x),x=sfm1(x);
 		out=x;
 	}
-	inline float backward(float *rout)
+	float backward(float *rout)
 	{
 		opt.init_backward();
 		float res=MSEloss(out,rout);
@@ -738,7 +739,7 @@ float total_loss;
 
 NETWORK brn;
 
-inline void loaddata(string imgpath,string anspath,int T)
+void loaddata(string imgpath,string anspath,int T)
 {
 	FILE* fimg = fopen(imgpath.c_str(), "rb");
 	FILE* fans = fopen(anspath.c_str(), "rb");
@@ -782,7 +783,7 @@ void train()
 	total_loss+=brn.backward(outs);
 }
 
-inline bool test(int cas)
+bool test(int cas)
 {
 	for (int i = 0; i < 28 * 28; i++) brn.in[i] = casin[cas][i];
 	brn.forward(true);
